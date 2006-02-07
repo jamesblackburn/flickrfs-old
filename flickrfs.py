@@ -21,6 +21,7 @@ from fuse import Fuse
 import os
 from errno import *
 from stat import *
+from traceback import format_exc
 
 import thread, array, string, urllib2, traceback, ConfigParser, mimetypes
 #@-node:imports
@@ -62,6 +63,32 @@ from flickrapi import FlickrAPI
 flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
 flickrSecret = "3fbf7144be7eca28"                  # shared "secret"
 browserName = "/usr/bin/firefox"                   # for out-of-band auth inside a web browser
+
+
+#Utility functions.
+def _log_exception_wrapper(func, *args, **kw):
+        """Call 'func' with args and kws and log any exception it throws.
+        """
+        try: func(*args, **kw)
+        except:
+            log.error("Exception in function %s" % func)
+            log.error(format_exc())
+
+def background(func, *args, **kw):
+        """Run 'func' as a thread, logging any exceptions it throws.
+
+        To run
+
+            somefunc(arg1, arg2='value')
+
+        as a thread, do:
+
+            background(somefunc, arg1, arg2='value')
+
+        Any exceptions thrown are logged as errors, and the traceback is logged.
+        """
+        thread.start_new_thread(_log_exception_wrapper, (func,)+args, kw)
+
 
 
 class TransFlickr:  #Transactions with flickr
@@ -387,7 +414,7 @@ class Flickrfs(Fuse):
 		self._mkfileOrDir("/tags", isDir=True)
 		self._mkfileOrDir("/tags/personal", isDir=True)
 		self._mkfileOrDir("/tags/public", isDir=True)
-        	thread.start_new_thread(self.sets_thread, ())
+        	background(self.sets_thread)
 
 	def writeMetaInfo(self, id, INFO):
 		f = open(os.path.join(flickrfsHome, '.'+id), 'w')
@@ -531,30 +558,27 @@ class Flickrfs(Fuse):
 		
 		if hasattr(tags_rsp.photos[0], 'photo'):
 			for b in tags_rsp.photos[0].photo:
-				try:
-					if personal:
-						INFO = TransFlickr().getPhotoInfo(b['id'])
-						if INFO==None:
-							log.error("Can't retrieve info:%s:"%(b['id'],))
-							continue
-						title = b['title'].replace('/', ' ')
-						if title.strip()=='':
-							title = str(b['id'])
-						title = title[:32]   #Only allow 32 characters
-						title = title + "." + INFO[0]
-						self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-						self._mkfileOrDir(path +"/" + title, id=b['id'],\
-							isDir=False, MODE=INFO[1], comm_meta=INFO[2])
-					else:
-						title = b['title'].replace('/', ' ')
-						if title.strip()=='':
-							title = str(b['id'])
-						title = title[:32]   #Only allow 32 characters
-						title = title + "." + b['originalformat']
-						self._mkfileOrDir(path+'/'+title, id=b['id'],\
-							isDir=False)
-				except:
-					pass
+				if personal:
+					INFO = TransFlickr().getPhotoInfo(b['id'])
+					if INFO==None:
+						log.error("Can't retrieve info:%s:"%(b['id'],))
+						continue
+					title = b['title'].replace('/', ' ')
+					if title.strip()=='':
+						title = str(b['id'])
+					title = title[:32]   #Only allow 32 characters
+					title = title + "." + INFO[0]
+					self.writeMetaInfo(b['id'], INFO) #Write to a localfile
+					self._mkfileOrDir(path +"/" + title, id=b['id'],\
+						isDir=False, MODE=INFO[1], comm_meta=INFO[2])
+				else:
+					title = b['title'].replace('/', ' ')
+					if title.strip()=='':
+						title = str(b['id'])
+					title = title[:32]   #Only allow 32 characters
+					title = title + "." + b['originalformat']
+					self._mkfileOrDir(path+'/'+title, id=b['id'],\
+						isDir=False)
 	
 	#@+node:attribs
     	flags = 1
@@ -843,7 +867,7 @@ class Flickrfs(Fuse):
 		if path.startswith("/tags"):
 			if path.count('/')==3:   #/tags/personal (or private)/dirname ONLY
 				self._mkfileOrDir(path, isDir=True)
-				thread.start_new_thread(self.tags_thread, (path,))
+				background(self.tags_thread, path)
 			else:
 				e = OSError("Not allowed to create directory:%s:"%(path))
 				e.errno = EACCES
@@ -858,7 +882,7 @@ class Flickrfs(Fuse):
 				raise e
 		elif path=='/stream':
 			self._mkfileOrDir(path, isDir=True)
-			thread.start_new_thread(self.stream_thread, (path,))
+			background(self.stream_thread, path)
 			
 		else:
 			e = OSError("Not allowed to create directory:%s:"%(path))

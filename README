@@ -43,3 +43,4 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       
   CVS - 
       - fixed SF bug 1352527: unhandled exception in thread during startup
+      - generalized fix for thread crashes which logs the traceback from the crash.
