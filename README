@@ -41,4 +41,5 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - CHANGE OF LOCATION: log file will be stored in ~/.flickrfs (instead of /var/log/flickrfs). 
       - bug fix: sets_thread crash while retrieving sets information in account having no sets. 
       
-
+  CVS - 
+      - fixed SF bug 1352527: unhandled exception in thread during startup

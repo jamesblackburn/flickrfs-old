@@ -443,7 +443,7 @@ class Flickrfs(Fuse):
 					log.error("sets_thread:Error while trying to retrieve photos from photoset:%s:"%(a.title[0].elementText,))
 					return
 					
-				retinfo = fapi.returntestFailure(rsp)
+				retinfo = fapi.returntestFailure(photos)
 				if retinfo=="OK":
 					for b in photos.photoset[0].photo:
 				# (format, mode, commMeta, desc, title, tags)
