@@ -501,7 +501,8 @@ class Flickrfs(Fuse):
 	
 	def stream_thread(self, path):
 		try:
-			rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras)
+			rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras,
+				auth_token=token)
 		except:
 			log.error("stream_thread:Error while trying to get stream")
 			return

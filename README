@@ -45,5 +45,6 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - bugfix: SF bug 1352527: unhandled exception in thread during startup
       - bugfix: generalized fix for thread crashes which logs the traceback from the crash.
       - bugfix: turn unicode strings from flickrfs into utf8.
-      - bugfix: supply auth to photoset call so that non-public photosets are retreived.
+      - bugfix: supply auth to photoset call so that non-public photosets are listed.
       - feature: use 'last update' as mtime and 'date uploaded' as ctime.
+      - bugfix: supply auth in streams_thread so non-public photos are listed.
