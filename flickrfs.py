@@ -320,7 +320,8 @@ class TransFlickr:  #Transactions with flickr
 class FlickrInode:
 	"""Class used to store Flickrfs inodes
 	"""
-	def __init__(self, path = None, ID = "", isDir=False, MODE = 0, comm_meta = "", size=0L):
+
+	def __init__(self, path = None, ID = "", isDir=False, MODE = 0, comm_meta = "", size=0L, mtime=None, ctime=None):
 		if isDir:
 			if MODE==0:
 				self.mode = S_IFDIR | 0755
@@ -350,8 +351,10 @@ class FlickrInode:
 		self.uid = int(os.getuid())
 		self.gid = int(os.getgid())
 		self.atime = timeInst
-		self.mtime = timeInst
-		self.ctime = timeInst
+		if mtime is None: self.mtime = timeInst
+		else: self.mtime = mtime
+		if ctime is None: self.ctime = timeInst
+		else: self.ctime = ctime
 		self.blocksize = DefaultBlockSize
 
 		
@@ -359,6 +362,8 @@ class FlickrInode:
 class Flickrfs(Fuse):
 
 	#@@+others
+
+	extras = "original_format,date_upload,last_update"
     
 	#@+node:__init__
     	def __init__(self, *args, **kw):
@@ -466,9 +471,11 @@ class Flickrfs(Fuse):
 				set_id = a['id']
 				self._mkfileOrDir(curdir, id=set_id, isDir=True)
 				try:
-					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token)
+					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token,
+						extras=self.extras)
 				except:
 					log.error("sets_thread:Error while trying to retrieve photos from photoset:%s:"%(a.title[0].elementText,))
+					log.error(format_exc())
 					return
 					
 				retinfo = fapi.returntestFailure(photos)
@@ -486,14 +493,15 @@ class Flickrfs(Fuse):
 						title = title + "." + INFO[0]
 						self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 						self._mkfileOrDir(curdir+'/'+title, id=str(b['id']),\
-							isDir=False, MODE=INFO[1], comm_meta=INFO[2])
+							isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
+							ctime=int(b['dateupload']))
 						
 						
 	#@-node:sets_thread
 	
 	def stream_thread(self, path):
 		try:
-			rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500")
+			rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras)
 		except:
 			log.error("stream_thread:Error while trying to get stream")
 			return
@@ -517,7 +525,7 @@ class Flickrfs(Fuse):
 				title = title + "." + INFO[0]
 				self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 				self._mkfileOrDir(path+'/'+title, id=b['id'],\
-					isDir=False, MODE=INFO[1], comm_meta=INFO[2])
+					isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				
 			
 	
@@ -534,17 +542,19 @@ class Flickrfs(Fuse):
 		if(path.startswith('/tags/personal')):
 			try:
 				tags_rsp = fapi.photos_search(api_key=flickrAPIKey,user_id=self.NSID,\
-					tags=sendtagList, tag_mode="all", per_page="500")
+					tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500")
 			except:
 				log.error("tags_thread:Error while trying to search personal photos")
+				log.error(format_exc())
 				return
 			personal = True
 		elif(path.startswith('/tags/public')):
 			try:
 				tags_rsp = fapi.photos_search(api_key=flickrAPIKey, tags=sendtagList,\
-					tag_mode="all", extras="original_format", per_page="500")
+					tag_mode="all", extras=self.extras, per_page="500")
 			except:
 				log.error("tags_thread:Error while trying to search public photos")
+				log.error(format_exc())
 				return
 			personal = False
 		else:
@@ -571,7 +581,7 @@ class Flickrfs(Fuse):
 					title = title + "." + INFO[0]
 					self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 					self._mkfileOrDir(path +"/" + title, id=b['id'],\
-						isDir=False, MODE=INFO[1], comm_meta=INFO[2])
+						isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				else:
 					title = b['title'].replace('/', ' ')
 					if title.strip()=='':
@@ -579,13 +589,13 @@ class Flickrfs(Fuse):
 					title = title[:32]   #Only allow 32 characters
 					title = title + "." + b['originalformat']
 					self._mkfileOrDir(path+'/'+title, id=b['id'],\
-						isDir=False)
+						isDir=False, mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 	
 	#@+node:attribs
     	flags = 1
 	#@-node:attribs
 
-	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta=""):
+	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta="", mtime=None, ctime=None):
 		#Path and Id may be unicode strings, so encode them to utf8 now before
 		#we use them, otherwise python will throw errors when we combine them
 		#with regular strings.
@@ -599,7 +609,7 @@ class Flickrfs(Fuse):
 		log.debug("parentDir:" + parentDir + ":")
 		if isDir==True:
 			log.debug("Creating directory:" + path)
-			self.inodeCache[path] = FlickrInode(path, ID=id, isDir=True)
+			self.inodeCache[path] = FlickrInode(path, ID=id, isDir=True, mtime=mtime, ctime=ctime)
 			if path=='/':
 				log.debug("This is root already. Can't find parent of GOD!!!")
 			else:
@@ -614,7 +624,7 @@ class Flickrfs(Fuse):
 				return
 			image_name = path[ind+1:dotind]
 			self.inodeCache[path] = FlickrInode(path, ID=id, isDir=False,\
-				MODE=MODE, comm_meta=comm_meta)
+				MODE=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
 			# Now create the meta info file
 			path = parentDir + '/.' + image_name + '.meta'
 			try:
