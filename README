@@ -45,3 +45,4 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - fixed SF bug 1352527: unhandled exception in thread during startup
       - generalized fix for thread crashes which logs the traceback from the crash.
       - unicode fix: turn unicode strings from flickrfs into utf8.
+      - supply auth to photoset call so that non-public photosets are retreived.

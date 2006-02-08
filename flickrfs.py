@@ -466,7 +466,7 @@ class Flickrfs(Fuse):
 				set_id = a['id']
 				self._mkfileOrDir(curdir, id=set_id, isDir=True)
 				try:
-					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id)
+					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token)
 				except:
 					log.error("sets_thread:Error while trying to retrieve photos from photoset:%s:"%(a.title[0].elementText,))
 					return
