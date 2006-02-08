@@ -23,7 +23,7 @@ from errno import *
 from stat import *
 from traceback import format_exc
 
-import thread, array, string, urllib2, traceback, ConfigParser, mimetypes
+import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codecs
 #@-node:imports
 #@+node:class Xmp
 
@@ -417,7 +417,8 @@ class Flickrfs(Fuse):
         	background(self.sets_thread)
 
 	def writeMetaInfo(self, id, INFO):
-		f = open(os.path.join(flickrfsHome, '.'+id), 'w')
+		#The metadata may be unicode strings, so we need to encode them on write
+		f = codecs.open(os.path.join(flickrfsHome, '.'+id), 'w', 'utf8')
 		f.write('#Metadata file : flickrfs - Virtual filesystem for flickr\n')
 		f.write('#Licences available: \n')
 		iter = self.licenseDict.iterkeys()
@@ -585,7 +586,11 @@ class Flickrfs(Fuse):
 	#@-node:attribs
 
 	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta=""):
-		path = str(pth)
+		#Path and Id may be unicode strings, so encode them to utf8 now before
+		#we use them, otherwise python will throw errors when we combine them
+		#with regular strings.
+		path = pth.encode('utf8')
+		id = id.encode('utf8')
 		ind = string.rindex(path, '/')
 		parentDir = path[:ind]
 
