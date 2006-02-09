@@ -601,7 +601,7 @@ class Flickrfs(Fuse):
 		#we use them, otherwise python will throw errors when we combine them
 		#with regular strings.
 		path = pth.encode('utf8')
-		id = id.encode('utf8')
+		if id!=0: id = id.encode('utf8')
 		ind = string.rindex(path, '/')
 		parentDir = path[:ind]
 
