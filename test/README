@@ -1,0 +1,46 @@
+This test program unfortunately depends on the existence AND STATE of
+a flickr account named 'flickrtester'.  The password to this account is
+'testme'.
+
+The code sets HOME to the test directory, so when you first run it it
+will make you go through the log in process, but the info stored will
+not affect your regular flickrfs account.  Likewise, the log file will
+be in a subdirectory of the test directory.
+
+Once you've run the script, you need to go on to the test account through
+the flickr interface and delete the uploaded photo from the stream.
+If you don't do this the test will fail the next time it is run.
+
+If a test fails, 'Error:' and a message is printed on the console after
+the test 'tag'.
+
+To be sure all tests have passed successful, you must also check the
+flickrfs log for any 'ERROR' messages.  A few errors do not cause the
+tests to fail.
+
+
+Existing bugs the code reports:
+
+o Nothing shows up in tags/personal/flickrfstestest
+
+o When the test set is deleted (during cleanup), an ERROR shows up in
+    the flickrfs log that the set could not be found.
+
+
+Known shortcomings of the current test set that I intend to fix:
+
+o Does not unmount and remount the file system to check that the
+    newly created image and set actually got uploaded
+
+o Does not test creating an image with international characters
+
+o Has not been checked to make sure it exercises all code paths.
+    (this is a long term project)
+
+
+Shortcomings I don't currently intend to fix (though I might
+eventually):
+
+o Dependence on a particular flickrfs test account and its state.
+
+o Dependency on the results returned by particular public tag searches
