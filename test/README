@@ -11,7 +11,7 @@ Once you've run the script, you need to go on to the test account through
 the flickr interface and delete the uploaded photo from the stream.
 If you don't do this the test will fail the next time it is run.
 
-If a test fails, 'Error:' and a message is printed on the console after
+If a test fails, 'Error!' and a message is printed on the console after
 the test 'tag'.
 
 To be sure all tests have passed successful, you must also check the
@@ -21,7 +21,9 @@ tests to fail.
 
 Existing bugs the code reports:
 
-o Nothing shows up in tags/personal/flickrfstestest
+o the uploaded test image does not appear in the tags/personal tests.
+    This may be a flickr phenomenon rather than a flickrfs bug,
+    I'm still investigating.
 
 o When the test set is deleted (during cleanup), an ERROR shows up in
     the flickrfs log that the set could not be found.
