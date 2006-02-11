@@ -543,7 +543,7 @@ class Flickrfs(Fuse):
 		if(path.startswith('/tags/personal')):
 			try:
 				tags_rsp = fapi.photos_search(api_key=flickrAPIKey,user_id=self.NSID,\
-					tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500")
+					tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500", auth_token=token)
 			except:
 				log.error("tags_thread:Error while trying to search personal photos")
 				log.error(format_exc())

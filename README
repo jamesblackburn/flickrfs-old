@@ -48,3 +48,4 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - bugfix: supply auth to photoset call so that non-public photosets are listed.
       - feature: use 'last update' as mtime and 'date uploaded' as ctime.
       - bugfix: supply auth in streams_thread so non-public photos are listed.
+      - bugfix: supply auth in tags_thread/personal dir so non-public photos are listed.
