@@ -362,11 +362,6 @@ class FileInode(Inode):
 		self.comm_meta = comm_meta
 
 		
-def FlickrInode(path = None, ID = "", isDir=False, MODE = 0, comm_meta = "", size=0L, mtime=None, ctime=None):
-	if isDir: return DirInode(path, ID, MODE, mtime, ctime)
-	else: return FileInode(path, ID, MODE, comm_meta, size, mtime, ctime)
-
-		
 
 class Flickrfs(Fuse):
 
@@ -619,7 +614,7 @@ class Flickrfs(Fuse):
 		log.debug("parentDir:" + parentDir + ":")
 		if isDir==True:
 			log.debug("Creating directory:" + path)
-			self.inodeCache[path] = FlickrInode(path, ID=id, isDir=True, mtime=mtime, ctime=ctime)
+			self.inodeCache[path] = DirInode(path, id, mtime=mtime, ctime=ctime)
 			if path=='/':
 				log.debug("This is root already. Can't find parent of GOD!!!")
 			else:
@@ -633,14 +628,12 @@ class Flickrfs(Fuse):
 				log.error("Can't create such a file")
 				return
 			image_name = path[ind+1:dotind]
-			self.inodeCache[path] = FlickrInode(path, ID=id, isDir=False,\
-				MODE=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
+			self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
 			# Now create the meta info file
 			path = parentDir + '/.' + image_name + '.meta'
 			try:
 				size = os.path.getsize(os.path.join(flickrfsHome, '.'+id))
-				self.inodeCache[path] = FlickrInode(path, ID=id, isDir=False,\
-					MODE=0644, size=size)
+				self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
 			except:
 				pass
 	
@@ -876,7 +869,7 @@ class Flickrfs(Fuse):
 		if typeinfo[0]==None or typeinfo[0].count('image')<=0:
 			f = open(os.path.join(flickrfsHome,'.'+name_file), 'w')
 			f.close()
-			self.inodeCache[path] = FlickrInode(path, ID=name_file, isDir=False, MODE=mode)
+			self.inodeCache[path] = FileInode(path, name_file, mode=mode)
 		else:
 			self._mkfileOrDir(path, id="NEW", isDir=False, MODE=mode)
 
