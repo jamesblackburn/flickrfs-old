@@ -19,11 +19,19 @@ flickrfs log for any 'ERROR' messages.  A few errors do not cause the
 tests to fail.
 
 
-Existing bugs the code reports:
+Bugs commented out in the tests:
 
-o the uploaded test image does not appear in the tags/personal tests.
-    This may be a flickr phenomenon rather than a flickrfs bug,
-    I'm still investigating.
+o the uploaded test image does not appear in the tags/personal
+    tests, though it does appear in the stream.  After some
+    investigation I'm assuming this is a delay on the flickr
+    side and not a flickrfs bug.
+
+o Uploading an image with non-ASCII characters does not work.
+    I'm not familiar enough with utf8/unicode issues to know
+    if I even coded the test correctly.
+
+
+Existing bugs that show up during tests:
 
 o When the test set is deleted (during cleanup), an ERROR shows up in
     the flickrfs log that the set could not be found.
@@ -31,10 +39,8 @@ o When the test set is deleted (during cleanup), an ERROR shows up in
 
 Known shortcomings of the current test set that I intend to fix:
 
-o Does not unmount and remount the file system to check that the
-    newly created image and set actually got uploaded
-
 o Does not test creating an image with international characters
+    (or, rather, the test is commented out).
 
 o Has not been checked to make sure it exercises all code paths.
     (this is a long term project)
