@@ -52,3 +52,5 @@ eventually):
 o Dependence on a particular flickrfs test account and its state.
 
 o Dependency on the results returned by particular public tag searches
+
+o Timing dependencies on responsiveness of flickr site (or Internet)
