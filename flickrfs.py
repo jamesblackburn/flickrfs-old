@@ -315,47 +315,56 @@ class TransFlickr:  #Transactions with flickr
 			return usr['nsid']
 		else:
 			return None
-		
-		
-class FlickrInode:
-	"""Class used to store Flickrfs inodes
+
+
+class Inode(object):
+	"""Common base class for all file system objects
 	"""
 
-	def __init__(self, path = None, ID = "", isDir=False, MODE = 0, comm_meta = "", size=0L, mtime=None, ctime=None):
-		if isDir:
-			if MODE==0:
-				self.mode = S_IFDIR | 0755
-			else:
-				self.mode = S_IFDIR | MODE
-			self.nlink = 2
-			self.size = 1L
-			self.setId = ID
-			self.dirfile = ""
-		else:
-			if MODE==0:
-				self.mode = S_IFREG | 0644
-			else:
-				self.mode = S_IFREG | MODE
-			self.nlink = 1
-			if size==0L:
-				self.size = 1L
-			else:
-				self.size = size
-			self.buf = ""
-			self.photoId = ID
-			self.comm_meta = comm_meta
-
-		timeInst = int(time.time())
+	def __init__(self, path=None, id='', mode=0, size=0L, mtime=None, ctime=None):
+		self.nlink = 1
+		self.size = size
+		self.id = id
+		self.mode = mode
 		self.ino = long(time.time())
 		self.dev = 409089L
 		self.uid = int(os.getuid())
 		self.gid = int(os.getgid())
-		self.atime = timeInst
-		if mtime is None: self.mtime = timeInst
+		now = int(time.time())
+		self.atime = now
+		if mtime is None: self.mtime = now
 		else: self.mtime = mtime
-		if ctime is None: self.ctime = timeInst
+		if ctime is None: self.ctime = now
 		else: self.ctime = ctime
 		self.blocksize = DefaultBlockSize
+
+
+class DirInode(Inode):
+
+	def __init__(self, path=None, id="", mode=0, mtime=None, ctime=None):
+		super(DirInode, self).__init__(path, id, mode, 0L, mtime, ctime)
+		if self.mode==0: self.mode = S_IFDIR | 0755
+		else: self.mode = S_IFDIR | self.mode
+		self.nlink += 1
+		self.dirfile = ""
+                self.setId = self.id
+
+
+class FileInode(Inode):
+
+	def __init__(self, path=None, id="", mode=0, comm_meta="", size=1L, mtime=None, ctime=None):
+		super(FileInode, self).__init__(path, id, mode, size, mtime, ctime)
+		if self.mode==0: self.mode = S_IFREG | 0644
+		else: self.mode = S_IFREG | self.mode
+		if size==0L: self.size = 1L
+		self.buf = ""
+		self.photoId = self.id
+		self.comm_meta = comm_meta
+
+		
+def FlickrInode(path = None, ID = "", isDir=False, MODE = 0, comm_meta = "", size=0L, mtime=None, ctime=None):
+	if isDir: return DirInode(path, ID, MODE, mtime, ctime)
+	else: return FileInode(path, ID, MODE, comm_meta, size, mtime, ctime)
 
 		
 
