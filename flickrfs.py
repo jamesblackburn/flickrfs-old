@@ -418,10 +418,10 @@ class Flickrfs(Fuse):
 			sys.exit(-1)
 
 		# do stuff to set up your filesystem here, if you want
-		self._mkfileOrDir("/", isDir=True)
-		self._mkfileOrDir("/tags", isDir=True)
-		self._mkfileOrDir("/tags/personal", isDir=True)
-		self._mkfileOrDir("/tags/public", isDir=True)
+		self._mkdir("/")
+		self._mkdir("/tags")
+		self._mkdir("/tags/personal")
+		self._mkdir("/tags/public")
         	background(self.sets_thread)
 
 	def writeMetaInfo(self, id, INFO):
@@ -454,7 +454,7 @@ class Flickrfs(Fuse):
         	running in foreground, you can have threads
         	"""    
 		log.info("sets_thread: started")
-		self._mkfileOrDir("/sets", isDir=True)
+		self._mkdir("/sets")
 		try:
 			rsp = fapi.photosets_getList(api_key=flickrAPIKey, auth_token=token)
 		except:
@@ -472,7 +472,7 @@ class Flickrfs(Fuse):
 				if title.strip()=='':
 					curdir = "/sets/" + a['id']
 				set_id = a['id']
-				self._mkfileOrDir(curdir, id=set_id, isDir=True)
+				self._mkdir(curdir, id=set_id)
 				try:
 					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token,
 						extras=self.extras)
@@ -495,8 +495,8 @@ class Flickrfs(Fuse):
 						title = title[:32]   #Only allow 32 characters
 						title = title + "." + INFO[0]
 						self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-						self._mkfileOrDir(curdir+'/'+title, id=str(b['id']),\
-							isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
+						self._mkfile(curdir+'/'+title, id=str(b['id']),\
+							MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
 							ctime=int(b['dateupload']))
 						
 						
@@ -528,8 +528,8 @@ class Flickrfs(Fuse):
 				title = title[:32]   #Only allow 32 characters
 				title = title + "." + INFO[0]
 				self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-				self._mkfileOrDir(path+'/'+title, id=b['id'],\
-					isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+				self._mkfile(path+'/'+title, id=b['id'],\
+					MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				
 			
 	
@@ -584,16 +584,16 @@ class Flickrfs(Fuse):
 					title = title[:32]   #Only allow 32 characters
 					title = title + "." + INFO[0]
 					self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-					self._mkfileOrDir(path +"/" + title, id=b['id'],\
-						isDir=False, MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+					self._mkfile(path +"/" + title, id=b['id'],\
+						MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				else:
 					title = b['title'].replace('/', ' ')
 					if title.strip()=='':
 						title = str(b['id'])
 					title = title[:32]   #Only allow 32 characters
 					title = title + "." + b['originalformat']
-					self._mkfileOrDir(path+'/'+title, id=b['id'],\
-						isDir=False, mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+					self._mkfile(path+'/'+title, id=b['id'],\
+						mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 	
 	#@+node:attribs
     	flags = 1
@@ -636,10 +636,6 @@ class Flickrfs(Fuse):
 			self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
 		except:
 			pass
-
-	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta="", mtime=None, ctime=None):
-		if isDir: self._mkdir(pth, id, MODE, comm_meta, mtime, ctime)
-		else: self._mkfile(pth, id, MODE, comm_meta, mtime, ctime)
 
 	#@+node:getattr
     	def getattr(self, path):
@@ -875,7 +871,7 @@ class Flickrfs(Fuse):
 			f.close()
 			self.inodeCache[path] = FileInode(path, name_file, mode=mode)
 		else:
-			self._mkfileOrDir(path, id="NEW", isDir=False, MODE=mode)
+			self._mkfile(path, id="NEW", MODE=mode)
 
 #    		if S_ISREG(mode):
 #    			open(path, "w")
@@ -888,7 +884,7 @@ class Flickrfs(Fuse):
 		log.debug("mkdir:" + path + ":")
 		if path.startswith("/tags"):
 			if path.count('/')==3:   #/tags/personal (or private)/dirname ONLY
-				self._mkfileOrDir(path, isDir=True)
+				self._mkdir(path)
 				background(self.tags_thread, path)
 			else:
 				e = OSError("Not allowed to create directory:%s:"%(path))
@@ -896,14 +892,14 @@ class Flickrfs(Fuse):
 				raise e
 		elif path.startswith("/sets"):
 			if path.count('/')==2:  #Only allow creation of new set /sets/newset
-				self._mkfileOrDir(path, id=0, isDir=True) 
+				self._mkdir(path, id=0)
 					#id=0 means that not yet created online
 			else:
 				e = OSError("Not allowed to create directory:%s:"%(path))
 				e.errno = EACCES
 				raise e
 		elif path=='/stream':
-			self._mkfileOrDir(path, isDir=True)
+			self._mkdir(path)
 			background(self.stream_thread, path)
 			
 		else:
