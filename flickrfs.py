@@ -599,38 +599,47 @@ class Flickrfs(Fuse):
     	flags = 1
 	#@-node:attribs
 
-	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta="", mtime=None, ctime=None):
+	def _parsepathid(self, path, id=""):
 		#Path and Id may be unicode strings, so encode them to utf8 now before
 		#we use them, otherwise python will throw errors when we combine them
 		#with regular strings.
-		path = pth.encode('utf8')
+		path = path.encode('utf8')
 		if id!=0: id = id.encode('utf8')
 	        parentDir, name = os.path.split(path)
 		if parentDir=='':
 			parentDir = '/'
 		log.debug("parentDir:" + parentDir + ":")
-		if isDir==True:
-			log.debug("Creating directory:" + path)
-			self.inodeCache[path] = DirInode(path, id, mtime=mtime, ctime=ctime)
-			if path=='/':
-				log.debug("This is root already. Can't find parent of GOD!!!")
-			else:
-				pinode = self.getInode(parentDir)
-				pinode.nlink += 1
+		return path, id, parentDir, name
+
+	def _mkdir(self, path, id="", MODE=0, comm_meta="", mtime=None, ctime=None):
+		path, id, parentDir, name = self._parsepathid(path, id)
+		log.debug("Creating directory:" + path)
+		self.inodeCache[path] = DirInode(path, id, mtime=mtime, ctime=ctime)
+		if path=='/':
+			log.debug("This is root already. Can't find parent of GOD!!!")
 		else:
-			log.debug("Creating file:" + path + ":with id:" + id)
-			image_name, extension = os.path.splitext(name)
-			if not extension:
-				log.error("Can't create such a file")
-				return
-			self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
-			# Now create the meta info file
-			path = parentDir + '/.' + image_name + '.meta'
-			try:
-				size = os.path.getsize(os.path.join(flickrfsHome, '.'+id))
-				self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
-			except:
-				pass
+			pinode = self.getInode(parentDir)
+			pinode.nlink += 1
+
+	def _mkfile(self, path, id="", MODE=0, comm_meta="", mtime=None, ctime=None):
+		path, id, parentDir, name = self._parsepathid(path, id)
+		log.debug("Creating file:" + path + ":with id:" + id)
+		image_name, extension = os.path.splitext(name)
+		if not extension:
+			log.error("Can't create such a file")
+			return
+		self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
+		# Now create the meta info file
+		path = parentDir + '/.' + image_name + '.meta'
+		try:
+			size = os.path.getsize(os.path.join(flickrfsHome, '.'+id))
+			self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
+		except:
+			pass
+
+	def _mkfileOrDir(self, pth, id="", isDir=False, MODE=0, comm_meta="", mtime=None, ctime=None):
+		if isDir: self._mkdir(pth, id, MODE, comm_meta, mtime, ctime)
+		else: self._mkfile(pth, id, MODE, comm_meta, mtime, ctime)
 
 	#@+node:getattr
     	def getattr(self, path):
