@@ -611,22 +611,21 @@ class Flickrfs(Fuse):
 		log.debug("parentDir:" + parentDir + ":")
 		return path, id, parentDir, name
 
-	def _mkdir(self, path, id="", MODE=0, comm_meta="", mtime=None, ctime=None):
+	def _mkdir(self, path, id="", mtime=None, ctime=None):
 		path, id, parentDir, name = self._parsepathid(path, id)
 		log.debug("Creating directory:" + path)
 		self.inodeCache[path] = DirInode(path, id, mtime=mtime, ctime=ctime)
-		if path=='/':
-			log.debug("This is root already. Can't find parent of GOD!!!")
-		else:
+		if path!='/':
 			pinode = self.getInode(parentDir)
 			pinode.nlink += 1
+			log.debug("nlink of %s is now %s" % (parentDir, pinode.nlink))
 
 	def _mkfile(self, path, id="", MODE=0, comm_meta="", mtime=None, ctime=None):
 		path, id, parentDir, name = self._parsepathid(path, id)
 		log.debug("Creating file:" + path + ":with id:" + id)
 		image_name, extension = os.path.splitext(name)
 		if not extension:
-			log.error("Can't create such a file")
+			log.error("Can't create file without extension")
 			return
 		self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
 		# Now create the meta info file
