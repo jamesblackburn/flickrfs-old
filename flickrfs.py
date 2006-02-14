@@ -321,7 +321,7 @@ class Inode(object):
 	"""Common base class for all file system objects
 	"""
 
-	def __init__(self, path=None, id='', mode=0, size=0L, mtime=None, ctime=None):
+	def __init__(self, path=None, id='', mode=None, size=0L, mtime=None, ctime=None):
 		self.nlink = 1
 		self.size = size
 		self.id = id
@@ -341,10 +341,10 @@ class Inode(object):
 
 class DirInode(Inode):
 
-	def __init__(self, path=None, id="", mode=0, mtime=None, ctime=None):
+	def __init__(self, path=None, id="", mode=None, mtime=None, ctime=None):
+		if mode is None: mode = 0755
 		super(DirInode, self).__init__(path, id, mode, 0L, mtime, ctime)
-		if self.mode==0: self.mode = S_IFDIR | 0755
-		else: self.mode = S_IFDIR | self.mode
+		self.mode = S_IFDIR | self.mode
 		self.nlink += 1
 		self.dirfile = ""
                 self.setId = self.id
@@ -352,10 +352,10 @@ class DirInode(Inode):
 
 class FileInode(Inode):
 
-	def __init__(self, path=None, id="", mode=0, comm_meta="", size=1L, mtime=None, ctime=None):
+	def __init__(self, path=None, id="", mode=None, comm_meta="", size=1L, mtime=None, ctime=None):
+		if mode is None: mode = 0644
 		super(FileInode, self).__init__(path, id, mode, size, mtime, ctime)
-		if self.mode==0: self.mode = S_IFREG | 0644
-		else: self.mode = S_IFREG | self.mode
+		self.mode = S_IFREG | self.mode
 		self.buf = ""
 		self.photoId = self.id
 		self.comm_meta = comm_meta
@@ -496,7 +496,7 @@ class Flickrfs(Fuse):
 						title = title + "." + INFO[0]
 						self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 						self._mkfile(curdir+'/'+title, id=str(b['id']),\
-							MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
+							mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
 							ctime=int(b['dateupload']))
 						
 						
@@ -529,7 +529,7 @@ class Flickrfs(Fuse):
 				title = title + "." + INFO[0]
 				self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 				self._mkfile(path+'/'+title, id=b['id'],\
-					MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+					mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				
 			
 	
@@ -585,7 +585,7 @@ class Flickrfs(Fuse):
 					title = title + "." + INFO[0]
 					self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 					self._mkfile(path +"/" + title, id=b['id'],\
-						MODE=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+						mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 				else:
 					title = b['title'].replace('/', ' ')
 					if title.strip()=='':
@@ -620,20 +620,20 @@ class Flickrfs(Fuse):
 			pinode.nlink += 1
 			log.debug("nlink of %s is now %s" % (parentDir, pinode.nlink))
 
-	def _mkfile(self, path, id="", MODE=0, comm_meta="", mtime=None, ctime=None):
+	def _mkfile(self, path, id="", mode=None, comm_meta="", mtime=None, ctime=None):
 		path, id, parentDir, name = self._parsepathid(path, id)
 		log.debug("Creating file:" + path + ":with id:" + id)
 		image_name, extension = os.path.splitext(name)
 		if not extension:
 			log.error("Can't create file without extension")
 			return
-		self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
+		self.inodeCache[path] = FileInode(path, id, mode=mode, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
 		# Now create the meta info inode if the meta info file exists
 		path = os.path.join(parentDir, '.' + image_name + '.meta')
 		datapath = os.path.join(flickrfsHome, '.'+id)
 		if os.path.exists(datapath):
 			size = os.path.getsize(datapath)
-			self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
+			self.inodeCache[path] = FileInode(path, id, size=size)
 
 	#@+node:getattr
     	def getattr(self, path):
@@ -869,7 +869,7 @@ class Flickrfs(Fuse):
 			f.close()
 			self.inodeCache[path] = FileInode(path, name_file, mode=mode)
 		else:
-			self._mkfile(path, id="NEW", MODE=mode)
+			self._mkfile(path, id="NEW", mode=mode)
 
 #    		if S_ISREG(mode):
 #    			open(path, "w")
