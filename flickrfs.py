@@ -356,7 +356,6 @@ class FileInode(Inode):
 		super(FileInode, self).__init__(path, id, mode, size, mtime, ctime)
 		if self.mode==0: self.mode = S_IFREG | 0644
 		else: self.mode = S_IFREG | self.mode
-		if size==0L: self.size = 1L
 		self.buf = ""
 		self.photoId = self.id
 		self.comm_meta = comm_meta
@@ -606,9 +605,7 @@ class Flickrfs(Fuse):
 		#with regular strings.
 		path = pth.encode('utf8')
 		if id!=0: id = id.encode('utf8')
-		ind = string.rindex(path, '/')
-		parentDir = path[:ind]
-
+	        parentDir, name = os.path.split(path)
 		if parentDir=='':
 			parentDir = '/'
 		log.debug("parentDir:" + parentDir + ":")
@@ -622,12 +619,10 @@ class Flickrfs(Fuse):
 				pinode.nlink += 1
 		else:
 			log.debug("Creating file:" + path + ":with id:" + id)
-			try:
-				dotind = path.rindex('.')
-			except:
+			image_name, extension = os.path.splitext(name)
+			if not extension:
 				log.error("Can't create such a file")
 				return
-			image_name = path[ind+1:dotind]
 			self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
 			# Now create the meta info file
 			path = parentDir + '/.' + image_name + '.meta'
@@ -636,7 +631,7 @@ class Flickrfs(Fuse):
 				self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
 			except:
 				pass
-	
+
 	#@+node:getattr
     	def getattr(self, path):
     		log.debug("getattr:" + path + ":")
