@@ -177,8 +177,10 @@ class TransFlickr:  #Transactions with flickr
 			mode = "07" + str(b_cnt) + "4"
 			mode = int(mode)
 
-		permcomment = rsp.photo[0].permissions[0]['permcomment']
-		permaddmeta = rsp.photo[0].permissions[0]['permaddmeta']
+		if hasattr(rsp.photo[0],'permissions'):
+			permcomment = rsp.photo[0].permissions[0]['permcomment']
+			permaddmeta = rsp.photo[0].permissions[0]['permaddmeta']
+		else: permcomment = permaddmeta = [None]
 		commMeta = permcomment + permaddmeta #Just add both. Required for chmod
 		desc = rsp.photo[0].description[0].elementText
 		title = rsp.photo[0].title[0].elementText
@@ -547,16 +549,7 @@ class Flickrfs(Fuse):
 		
 		if hasattr(tags_rsp.photos[0], 'photo'):
 			for b in tags_rsp.photos[0].photo:
-				if personal:
-					self._mkfileWithMeta(path, b)
-				else:
-					title = b['title'].replace('/', ' ')
-					if title.strip()=='':
-						title = str(b['id'])
-					title = title[:32]   #Only allow 32 characters
-					title = title + "." + b['originalformat']
-					self._mkfile(path+'/'+title, id=b['id'],\
-						mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+				self._mkfileWithMeta(path, b)
 
 	def _mkfileWithMeta(self, path, b):
 		INFO = TransFlickr().getPhotoInfo(b['id'])

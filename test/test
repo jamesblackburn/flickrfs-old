@@ -36,18 +36,18 @@ testls ="""total 2
 -rwxr-xr-x  1 rdmurray users 1 Feb 10 19:46 IMG_9138.png
 --wxr-x--T  1 rdmurray users 1 Feb 10 20:50 IMG_9139.png"""
 rscls = """total 2
--rw-r--r--  1 rdmurray users 1 Feb  2 22:47 Now That's A Radio.jpg
--rw-r--r--  1 rdmurray users 1 Nov  7 09:38 WJCU Studio.jpg
--rw-r--r--  1 rdmurray users 1 Feb  2 22:47 Whatever You Want To Hear.jpg"""
+-rwxr-xr-x  1 rdmurray users 1 Feb  2 22:47 Now That's A Radio.jpg
+-rwxr-xr-x  1 rdmurray users 1 Nov  7 09:38 WJCU Studio.jpg
+-rwxr-xr-x  1 rdmurray users 1 Feb  2 22:47 Whatever You Want To Hear.jpg"""
 tratls = """total 4
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 Fo da Luciano.jpg
--rw-r--r--  1 rdmurray users 1 Jan 17 07:35 Lotti che non \xc3\xa8 Lotti.jpg
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 dscn5783.jpg.jpg
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 dscn5784.jpg.jpg
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 dscn5789.jpg.jpg
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 il menu memorabile..jpg
--rw-r--r--  1 rdmurray users 1 Jan 30 04:47 la gattona grassa da Luciano.jpg
--rw-r--r--  1 rdmurray users 1 Jan 17 07:35 ride.jpg"""
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 Fo da Luciano.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 Lotti che non \xc3\xa8 Lotti.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5783.jpg.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5784.jpg.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5789.jpg.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 il menu memorabile..jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 la gattona grassa da Luciano.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 ride.jpg"""
 
 if len(argv)>1 and argv[1]=='extended': extended = True
 else: extended = False
@@ -95,11 +95,13 @@ try:
     dirlist = listdir('mnt/stream')
     listEQ(listdir('mnt/stream'), ['.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png',
         '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
-    listEQ(listdir('mnt/tags/public/radio:station:college'), ["Now That's A Radio.jpg", 'WJCU Studio.jpg', 'Whatever You Want To Hear.jpg'],
-        'check example public tag set')
+    listEQ(listdir('mnt/tags/public/radio:station:college'), ["Now That's A Radio.jpg", 'WJCU Studio.jpg', 'Whatever You Want To Hear.jpg',
+        ".Now That's A Radio.meta", '.WJCU Studio.meta', '.Whatever You Want To Hear.meta'], 'check example public tag set')
     strEQ(cmd('ls -l mnt/tags/public/radio:station:college')[1], rscls, 'ls on example public tag set')
     listEQ(listdir('mnt/tags/public/trattoriatoscana'), ['Fo da Luciano.jpg', 'Lotti che non \xc3\xa8 Lotti.jpg', 'dscn5783.jpg.jpg',
-        'dscn5784.jpg.jpg', 'dscn5789.jpg.jpg', 'il menu memorabile..jpg', 'la gattona grassa da Luciano.jpg', 'ride.jpg'],
+        'dscn5784.jpg.jpg', 'dscn5789.jpg.jpg', 'il menu memorabile..jpg', 'la gattona grassa da Luciano.jpg', 'ride.jpg',
+        '.Fo da Luciano.meta', '.Lotti che non \xc3\xa8 Lotti.meta', '.dscn5783.jpg.meta',
+        '.dscn5784.jpg.meta', '.dscn5789.jpg.meta', '.il menu memorabile..meta', '.la gattona grassa da Luciano.meta', '.ride.meta'],
         'public tag set with international characters')
     strEQ(cmd('ls -l mnt/tags/public/trattoriatoscana')[1], tratls, 'ls on international char public tag set')
     if extended:
@@ -115,7 +117,7 @@ try:
         listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
             'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have uploaded image')
         #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-            'IMG_9139.png'], 'personal/flickrfstesttest should have uploaded image (but does not)')
+        #    'IMG_9139.png'], 'personal/flickrfstesttest should have uploaded image (but does not)')
     else: print "NOTE: Skipped extended tests."
     
 
