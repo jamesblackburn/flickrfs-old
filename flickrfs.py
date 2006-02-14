@@ -628,13 +628,12 @@ class Flickrfs(Fuse):
 			log.error("Can't create file without extension")
 			return
 		self.inodeCache[path] = FileInode(path, id, mode=MODE, comm_meta=comm_meta, mtime=mtime, ctime=ctime)
-		# Now create the meta info file
-		path = parentDir + '/.' + image_name + '.meta'
-		try:
-			size = os.path.getsize(os.path.join(flickrfsHome, '.'+id))
+		# Now create the meta info inode if the meta info file exists
+		path = os.path.join(parentDir, '.' + image_name + '.meta')
+		datapath = os.path.join(flickrfsHome, '.'+id)
+		if os.path.exists(datapath):
+			size = os.path.getsize(datapath)
 			self.inodeCache[path] = FileInode(path, id, mode=0644, size=size)
-		except:
-			pass
 
 	#@+node:getattr
     	def getattr(self, path):
