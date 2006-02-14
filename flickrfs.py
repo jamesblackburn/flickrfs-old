@@ -484,20 +484,7 @@ class Flickrfs(Fuse):
 				retinfo = fapi.returntestFailure(photos)
 				if retinfo=="OK":
 					for b in photos.photoset[0].photo:
-				# (format, mode, commMeta, desc, title, tags)
-						INFO = TransFlickr().getPhotoInfo(b['id'])
-						if INFO==None:
-							log.error("Can't retrieve info:%s:"%(b['id'],))
-							continue
-						title = b['title'].replace('/', ' ')
-						if title.strip()=='':
-							title = str(b['id'])
-						title = title[:32]   #Only allow 32 characters
-						title = title + "." + INFO[0]
-						self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-						self._mkfile(curdir+'/'+title, id=str(b['id']),\
-							mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']),
-							ctime=int(b['dateupload']))
+						self._mkfileWithMeta(curdir, b)
 						
 						
 	#@-node:sets_thread
@@ -517,20 +504,7 @@ class Flickrfs(Fuse):
 			return
 		if hasattr(rsp.photos[0], 'photo'):
 			for b in rsp.photos[0].photo:
-				# (format, mode, commMeta, desc, title, tags)
-				INFO = TransFlickr().getPhotoInfo(b['id'])
-				if INFO==None:
-					log.error("Can't retrieve info:%s:"%(b['id'],))
-					continue
-				title = b['title'].replace('/', ' ')
-				if title.strip()=='':
-					title = str(b['id'])
-				title = title[:32]   #Only allow 32 characters
-				title = title + "." + INFO[0]
-				self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-				self._mkfile(path+'/'+title, id=b['id'],\
-					mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
-				
+				self._mkfileWithMeta(path, b)
 			
 	
 	def tags_thread(self, path):
@@ -574,18 +548,7 @@ class Flickrfs(Fuse):
 		if hasattr(tags_rsp.photos[0], 'photo'):
 			for b in tags_rsp.photos[0].photo:
 				if personal:
-					INFO = TransFlickr().getPhotoInfo(b['id'])
-					if INFO==None:
-						log.error("Can't retrieve info:%s:"%(b['id'],))
-						continue
-					title = b['title'].replace('/', ' ')
-					if title.strip()=='':
-						title = str(b['id'])
-					title = title[:32]   #Only allow 32 characters
-					title = title + "." + INFO[0]
-					self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-					self._mkfile(path +"/" + title, id=b['id'],\
-						mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+					self._mkfileWithMeta(path, b)
 				else:
 					title = b['title'].replace('/', ' ')
 					if title.strip()=='':
@@ -594,6 +557,20 @@ class Flickrfs(Fuse):
 					title = title + "." + b['originalformat']
 					self._mkfile(path+'/'+title, id=b['id'],\
 						mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+
+	def _mkfileWithMeta(self, path, b):
+		INFO = TransFlickr().getPhotoInfo(b['id'])
+		if INFO==None:
+			log.error("Can't retrieve info:%s:"%(b['id'],))
+			return
+		title = b['title'].replace('/', ' ')
+		if title.strip()=='':
+			title = str(b['id'])
+		title = title[:32]   #Only allow 32 characters
+		title = title + "." + INFO[0]
+		self.writeMetaInfo(b['id'], INFO) #Write to a localfile
+		self._mkfile(path +"/" + title, id=b['id'],\
+			mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 	
 	#@+node:attribs
     	flags = 1

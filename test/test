@@ -83,14 +83,15 @@ try:
     sleep(10)
     #The uploaded pic does _not_ appear, and I don't know why.  I suspect it's not a flickerfs bug, but some
     # sort of delay on the flickr side, since the image does show up in our stream.
-    #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-    #        'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have some of our images')
+    # 20060214: the pic is appearing now, and I don't know what changed.
     listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-            'IMG_9139.png'], 'personal/flickrfstesttest should have some of our images')
-    #listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png',
-    #        '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest:flickrfstest should have fewer images')
-    listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png'],
-            'personal/flickrfstesttest:flickrfstest should have fewer images')
+            'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have some of our images')
+    #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
+    #        'IMG_9139.png'], 'personal/flickrfstesttest should have some of our images')
+    listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png',
+            '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest:flickrfstest should have fewer images')
+    #listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png'],
+    #        'personal/flickrfstesttest:flickrfstest should have fewer images')
     dirlist = listdir('mnt/stream')
     listEQ(listdir('mnt/stream'), ['.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png',
         '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
@@ -111,9 +112,9 @@ try:
         mkdir('mnt/tags/personal/flickrfstesttest')
         sleep(10)
         #See above.
-        #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-        #    'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have uploaded image')
         listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
+            'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have uploaded image')
+        #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
             'IMG_9139.png'], 'personal/flickrfstesttest should have uploaded image (but does not)')
     else: print "NOTE: Skipped extended tests."
     
