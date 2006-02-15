@@ -457,13 +457,7 @@ class Flickrfs(Fuse):
         	"""    
 		log.info("sets_thread: started")
 		self._mkdir("/sets")
-		try:
-			rsp = fapi.photosets_getList(api_key=flickrAPIKey, auth_token=token)
-		except:
-			log.error("Can't retrieve information about sets.")
-			log.error("You may wish to remount the filesystem")
-			return 
-
+		rsp = fapi.photosets_getList(api_key=flickrAPIKey, auth_token=token)
 		retinfo = fapi.returntestFailure(rsp)
 		if retinfo!="OK":
 			return
@@ -475,14 +469,8 @@ class Flickrfs(Fuse):
 					curdir = "/sets/" + a['id']
 				set_id = a['id']
 				self._mkdir(curdir, id=set_id)
-				try:
-					photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token,
-						extras=self.extras)
-				except:
-					log.error("sets_thread:Error while trying to retrieve photos from photoset:%s:"%(a.title[0].elementText,))
-					log.error(format_exc())
-					return
-					
+				photos = fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token,
+					extras=self.extras)
 				retinfo = fapi.returntestFailure(photos)
 				if retinfo=="OK":
 					for b in photos.photoset[0].photo:
@@ -492,13 +480,9 @@ class Flickrfs(Fuse):
 	#@-node:sets_thread
 	
 	def stream_thread(self, path):
-		try:
-			rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras,
-				auth_token=token)
-		except:
-			log.error("stream_thread:Error while trying to get stream")
-			return
-
+		log.info("stream_thread started")
+		rsp = fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras,
+			auth_token=token)
 		retinfo = fapi.returntestFailure(rsp)
 		if retinfo!="OK":
 			log.error("Can't retrive photos from your stream")
@@ -520,22 +504,12 @@ class Flickrfs(Fuse):
 		sendtagList = ','.join(tagName.split(':'))
 
 		if(path.startswith('/tags/personal')):
-			try:
-				tags_rsp = fapi.photos_search(api_key=flickrAPIKey,user_id=self.NSID,\
-					tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500", auth_token=token)
-			except:
-				log.error("tags_thread:Error while trying to search personal photos")
-				log.error(format_exc())
-				return
+			tags_rsp = fapi.photos_search(api_key=flickrAPIKey,user_id=self.NSID,\
+				tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500", auth_token=token)
 			personal = True
 		elif(path.startswith('/tags/public')):
-			try:
-				tags_rsp = fapi.photos_search(api_key=flickrAPIKey, tags=sendtagList,\
-					tag_mode="all", extras=self.extras, per_page="500")
-			except:
-				log.error("tags_thread:Error while trying to search public photos")
-				log.error(format_exc())
-				return
+			tags_rsp = fapi.photos_search(api_key=flickrAPIKey, tags=sendtagList,\
+				tag_mode="all", extras=self.extras, per_page="500")
 			personal = False
 		else:
 			return
