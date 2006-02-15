@@ -560,7 +560,9 @@ class Flickrfs(Fuse):
 		if title.strip()=='':
 			title = str(b['id'])
 		title = title[:32]   #Only allow 32 characters
-		title = title + "." + INFO[0]
+		ext = '.' + INFO[0]
+		if os.path.splitext(title)[1]!=ext:
+			title = title + ext
 		self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 		self._mkfile(path +"/" + title, id=b['id'],\
 			mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))

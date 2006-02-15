@@ -42,9 +42,9 @@ rscls = """total 2
 tratls = """total 4
 -rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 Fo da Luciano.jpg
 -rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 Lotti che non \xc3\xa8 Lotti.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5783.jpg.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5784.jpg.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5789.jpg.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5783.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5784.jpg
+-rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5789.jpg
 -rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 il menu memorabile..jpg
 -rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 la gattona grassa da Luciano.jpg
 -rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 ride.jpg"""
@@ -98,10 +98,10 @@ try:
     listEQ(listdir('mnt/tags/public/radio:station:college'), ["Now That's A Radio.jpg", 'WJCU Studio.jpg', 'Whatever You Want To Hear.jpg',
         ".Now That's A Radio.meta", '.WJCU Studio.meta', '.Whatever You Want To Hear.meta'], 'check example public tag set')
     strEQ(cmd('ls -l mnt/tags/public/radio:station:college')[1], rscls, 'ls on example public tag set')
-    listEQ(listdir('mnt/tags/public/trattoriatoscana'), ['Fo da Luciano.jpg', 'Lotti che non \xc3\xa8 Lotti.jpg', 'dscn5783.jpg.jpg',
-        'dscn5784.jpg.jpg', 'dscn5789.jpg.jpg', 'il menu memorabile..jpg', 'la gattona grassa da Luciano.jpg', 'ride.jpg',
-        '.Fo da Luciano.meta', '.Lotti che non \xc3\xa8 Lotti.meta', '.dscn5783.jpg.meta',
-        '.dscn5784.jpg.meta', '.dscn5789.jpg.meta', '.il menu memorabile..meta', '.la gattona grassa da Luciano.meta', '.ride.meta'],
+    listEQ(listdir('mnt/tags/public/trattoriatoscana'), ['Fo da Luciano.jpg', 'Lotti che non \xc3\xa8 Lotti.jpg', 'dscn5783.jpg',
+        'dscn5784.jpg', 'dscn5789.jpg', 'il menu memorabile..jpg', 'la gattona grassa da Luciano.jpg', 'ride.jpg',
+        '.Fo da Luciano.meta', '.Lotti che non \xc3\xa8 Lotti.meta', '.dscn5783.meta',
+        '.dscn5784.meta', '.dscn5789.meta', '.il menu memorabile..meta', '.la gattona grassa da Luciano.meta', '.ride.meta'],
         'public tag set with international characters')
     strEQ(cmd('ls -l mnt/tags/public/trattoriatoscana')[1], tratls, 'ls on international char public tag set')
     if extended:

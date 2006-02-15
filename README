@@ -50,3 +50,5 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - bugfix: supply auth in streams_thread so non-public photos are listed.
       - bugfix: supply auth in tags_thread/personal dir so non-public photos are listed.
       - feature: public photos now also have metadata files.
+      - bugfix: photos whose titles already end with the image extension no longer get an extra
+            copy of the extenion name tacked on.
