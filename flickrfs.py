@@ -89,6 +89,8 @@ def background(func, *args, **kw):
         """
         thread.start_new_thread(_log_exception_wrapper, (func,)+args, kw)
 
+def kwdict(**kw): return kw
+
 
 
 class TransFlickr:  #Transactions with flickr
@@ -499,28 +501,17 @@ class Flickrfs(Fuse):
 		if tagName.strip()=='':
 			log.error("The tagName:%s: doesn't contain any tags"%(tagName))
 			return 
-
 		log.info("tags_thread:" + tagName + ":started")
 		sendtagList = ','.join(tagName.split(':'))
-
-		if(path.startswith('/tags/personal')):
-			tags_rsp = fapi.photos_search(api_key=flickrAPIKey,user_id=self.NSID,\
-				tags=sendtagList, extras=self.extras, tag_mode="all", per_page="500", auth_token=token)
-			personal = True
-		elif(path.startswith('/tags/public')):
-			tags_rsp = fapi.photos_search(api_key=flickrAPIKey, tags=sendtagList,\
-				tag_mode="all", extras=self.extras, per_page="500")
-			personal = False
-		else:
-			return
-
+		kw = kwdict(api_key=flickrAPIKey, tags=sendtagList, tag_mode="all", extras=self.extras, per_page="500")
+		if(path.startswith('/tags/personal')): kw = kwdict(user_id=self.NSID, auth_token=token, **kw)
+		tags_rsp = fapi.photos_search(**kw)
 		log.debug("Search for photos with tag:" + sendtagList + ":done")
 		retinfo = fapi.returntestFailure(tags_rsp)
 		if retinfo!="OK":
 			log.error("Couldn't search for the photos")
 			log.error("retinfo:%s"%(retinfo,))
 			return
-		
 		if hasattr(tags_rsp.photos[0], 'photo'):
 			for b in tags_rsp.photos[0].photo:
 				self._mkfileWithMeta(path, b)
