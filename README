@@ -52,3 +52,4 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - feature: public photos now also have metadata files.
       - bugfix: photos whose titles already end with the image extension no longer get an extra
             copy of the extenion name tacked on.
+      - bugfix: fixed inability to retrieve certain photos.

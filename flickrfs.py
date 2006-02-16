@@ -269,12 +269,16 @@ class TransFlickr:  #Transactions with flickr
 			return None
 		buf = ""
 		for a in rsp.sizes[0].size:
-			if a['label']=='Large':
+			if a['label']=='Original':
 				try:
 					f = urllib2.urlopen(a['source'])
 					buf = f.read()
 				except:
+					log.error("Exception in getPhoto")
 					return ""
+		if not buf:
+			f = urllib2.urlopen(rsp.sizes[0].size[-1]['source'])
+			buf = f.read()
 		return buf
 
 	def removePhotofromSet(self, photoId, photosetId):
