@@ -29,6 +29,8 @@ import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codec
 
 #Some global definitions and functions
 
+DEFAULTBLOCKSIZE = 4*1024  #4KB
+
 # Setup logging
 import time, logging, logging.handlers
 log = logging.getLogger('flickrfs')
@@ -344,7 +346,7 @@ class Inode(object):
 		else: self.mtime = mtime
 		if ctime is None: self.ctime = now
 		else: self.ctime = ctime
-		self.blocksize = DefaultBlockSize
+		self.blocksize = DEFAULTBLOCKSIZE
 
 
 class DirInode(Inode):
@@ -393,8 +395,6 @@ class Flickrfs(Fuse):
 		self.NSID = ""
 		global fapi
     		global token
-		global DefaultBlockSize
-		DefaultBlockSize = 4*1024  #4KB
 		self.transfl = TransFlickr()
 		fapi = FlickrAPI(flickrAPIKey, flickrSecret)
 
