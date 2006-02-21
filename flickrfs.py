@@ -395,6 +395,7 @@ class Flickrfs(Fuse):
     		global token
 		global DefaultBlockSize
 		DefaultBlockSize = 4*1024  #4KB
+		self.transfl = TransFlickr()
 		fapi = FlickrAPI(flickrAPIKey, flickrSecret)
 
 		# proceed with auth
@@ -412,14 +413,14 @@ class Flickrfs(Fuse):
 	    		#Add some authorization checks here(?)
 		log.info('Authorization complete')
 		
-		self.NSID = TransFlickr().getUserId()
+		self.NSID = self.transfl.getUserId()
 		if self.NSID==None:
 			print "Can't retrieve user information"
 			log.error("Initialization:Can't retrieve user information")
 			sys.exit(-1)
 
 		log.info('Getting list of licenses available')
-		self.licenseDict = TransFlickr().getLicenses()
+		self.licenseDict = self.transfl.getLicenses()
 		if self.licenseDict==None:
 			print "Can't retreive license information"
 			log.error("Initialization:Can't retrieve license information")
@@ -521,7 +522,7 @@ class Flickrfs(Fuse):
 				self._mkfileWithMeta(path, b)
 
 	def _mkfileWithMeta(self, path, b):
-		INFO = TransFlickr().getPhotoInfo(b['id'])
+		INFO = self.transfl.getPhotoInfo(b['id'])
 		if INFO==None:
 			log.error("Can't retrieve info:%s:"%(b['id'],))
 			return
@@ -639,7 +640,7 @@ class Flickrfs(Fuse):
 				ind = path.rindex('/')
 				pPath = path[:ind]
 				pinode = self.getInode(pPath)
-				TransFlickr().removePhotofromSet(photoId=inode.photoId, photosetId=pinode.setId)
+				self.transfl.removePhotofromSet(photoId=inode.photoId, photosetId=pinode.setId)
 	
 			del inode
 		else:
@@ -678,7 +679,7 @@ class Flickrfs(Fuse):
 			pInode.nlink -= 1
 		elif path.startswith('/sets/'):
 			inode = self.inodeCache.pop(path)
-			TransFlickr().deleteSet(inode.setId)
+			self.transfl.deleteSet(inode.setId)
 			del inode
 			pInode = self.getInode(pPath)
 			pInode.nlink -= 1
@@ -753,7 +754,7 @@ class Flickrfs(Fuse):
 			inode.mode = mode
 			return
 
-		if TransFlickr().setPerm(inode.photoId, mode, inode.comm_meta)==True:
+		if self.transfl.setPerm(inode.photoId, mode, inode.comm_meta)==True:
 			inode.mode = mode
 	#@-node:chmod
 	    
@@ -883,7 +884,7 @@ class Flickrfs(Fuse):
 			return 0
 		if inode.buf=="":	
 			log.debug("Retrieving image from flickr: " + inode.photoId)
-			inode.buf = str(TransFlickr().getPhoto(inode.photoId))
+			inode.buf = str(self.transfl.getPhoto(inode.photoId))
 			inode.size = long(inode.buf.__len__())
 			log.debug("Size of image: " + str(inode.size))
 		return 0
@@ -911,7 +912,7 @@ class Flickrfs(Fuse):
 			
 		if inode.buf == "":
 			log.debug("Retrieving image from flickr: " + inode.photoId)
-			inode.buf = str(TransFlickr().getPhoto(inode.photoId))
+			inode.buf = str(self.transfl.getPhoto(inode.photoId))
 			inode.size = long(inode.buf.__len__())
 		sIndex = int(offset)
 		ilen = int(len)
@@ -943,15 +944,15 @@ class Flickrfs(Fuse):
 				license = cp.get('metainfo', 'license')
 			
 			log.debug("Setting metadata:%s:"%(fname,))
-			if TransFlickr().setMeta(photoId, title, desc)==False:
+			if self.transfl.setMeta(photoId, title, desc)==False:
 				return "Error:Can't set Meta information"
 				
 			log.debug("Setting tags:%s:"%(fname,))
-			if TransFlickr().setTags(photoId, tags)==False:
+			if self.transfl.setTags(photoId, tags)==False:
 				return "Error:Can't set tags"
 
 			log.debug("Setting license:%s:"%(fname,))
-			if TransFlickr().setLicense(photoId, license)==False:
+			if self.transfl.setLicense(photoId, license)==False:
 				return "Error:Can't set license"
 						
 		except:
@@ -965,7 +966,7 @@ class Flickrfs(Fuse):
 		
 		# I think its better that you wait when you upload photos. 
 		# So, dun start a thread. Do it inline!
-#			thread.start_new_thread(TransFlickr().uploadfile, (path, taglist, inode.buf))
+#			thread.start_new_thread(self.transfl.uploadfile, (path, taglist, inode.buf))
 		ind = path.rindex('/')
 		name_file = path[ind+1:]
 		if name_file.startswith('.') and name_file.count('.meta')>0:
@@ -1015,7 +1016,7 @@ class Flickrfs(Fuse):
 				tags = [ '"%s"'%(a,) for a in tags]
 				tags.append('flickrfs')
 				taglist = ' '.join(tags)
-				id = TransFlickr().uploadfile(path, taglist, inode.buf, inode.mode)
+				id = self.transfl.uploadfile(path, taglist, inode.buf, inode.mode)
 				del inode.buf
 				inode.buf = ""
 				inode.photoId = id
@@ -1038,7 +1039,7 @@ class Flickrfs(Fuse):
 				setnTags.append('flickrfs')
 				taglist = ' '.join(setnTags)
 				log.debug("Uploading with tags: %s" % (taglist))
-				id = TransFlickr().uploadfile(path, taglist, inode.buf, inode.mode)
+				id = self.transfl.uploadfile(path, taglist, inode.buf, inode.mode)
 				del inode.buf
 				inode.buf = ""
 				inode.photoId = id
@@ -1046,13 +1047,13 @@ class Flickrfs(Fuse):
 				#Create set if it doesn't exist online (i.e. if id=0)
 				if pinode.setId==0:
 					try:
-						pinode.setId = TransFlickr().createSet(parentPath, id)
+						pinode.setId = self.transfl.createSet(parentPath, id)
 					except:
 						e = OSError("Can't create a new set")
 						e.errno = EIO
 						raise e
 				else:
-					TransFlickr().put2Set(pinode.setId, id)
+					self.transfl.put2Set(pinode.setId, id)
 				
     		return len(buf)
 	#@-node:write
@@ -1103,7 +1104,7 @@ class Flickrfs(Fuse):
 		files_free_user = 0L
 		flag = 0
         	namelen = 255
-		(max, used) = TransFlickr().getBandwidthInfo()
+		(max, used) = self.transfl.getBandwidthInfo()
 		if max!=None:
 			total_blocks = long(int(max)/block_size)
 			blocks_free = long( ( int(max)-int(used) )/block_size)
