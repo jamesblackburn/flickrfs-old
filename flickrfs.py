@@ -18,7 +18,7 @@
 #@+node:imports
 
 from fuse import Fuse
-import os
+import os, sys
 from errno import *
 from stat import *
 from traceback import format_exc

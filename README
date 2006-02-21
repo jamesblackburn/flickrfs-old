@@ -53,3 +53,4 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
       - bugfix: photos whose titles already end with the image extension no longer get an extra
             copy of the extenion name tacked on.
       - bugfix: fixed inability to retrieve certain photos.
+      - bugfix: added missing import of 'sys' module (only used during certain error exits)
