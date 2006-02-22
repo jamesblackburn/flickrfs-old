@@ -97,6 +97,8 @@ def kwdict(**kw): return kw
 
 class TransFlickr:  #Transactions with flickr
 
+	extras = "original_format,date_upload,last_update"
+
 	def __init__(self, flickrAPIKey, flickrSecret):
 		self.fapi = FlickrAPI(flickrAPIKey, flickrSecret)
 		# proceed with auth
@@ -344,6 +346,26 @@ class TransFlickr:  #Transactions with flickr
 		else:
 			return None
 
+	def getPhotosetList(self):
+		rsp = self.fapi.photosets_getList(api_key=flickrAPIKey, auth_token=self.authtoken)
+		retinfo = self.fapi.returntestFailure(rsp)
+		if retinfo!="OK":
+			log.error("Error getting photoset list: %s" % (retinfo))
+			return []
+		if not hasattr(rsp.photosets[0], "photoset"):
+			return []
+		return rsp.photosets[0].photoset
+
+	def getPhotosFromPhotoset(self, photoset_id):
+		photos = self.fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=photoset_id, auth_token=self.authtoken,
+			extras=self.extras)
+		retinfo = self.fapi.returntestFailure(photos)
+		if retinfo=="OK":
+			return photos.photoset[0].photo
+		else:
+			log.error("Error getting photos from photoset %s: %s" % (photoset_id, retinfo))
+			return []
+
 
 class Inode(object):
 	"""Common base class for all file system objects
@@ -394,7 +416,7 @@ class Flickrfs(Fuse):
 
 	#@@+others
 
-	extras = "original_format,date_upload,last_update"
+	extras = TransFlickr.extras
     
 	#@+node:__init__
     	def __init__(self, *args, **kw):
@@ -464,24 +486,15 @@ class Flickrfs(Fuse):
         	"""    
 		log.info("sets_thread: started")
 		self._mkdir("/sets")
-		rsp = self.transfl.fapi.photosets_getList(api_key=flickrAPIKey, auth_token=self.transfl.authtoken)
-		retinfo = self.transfl.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
-			return
-		if hasattr(rsp.photosets[0], "photoset"):
-			for a in rsp.photosets[0].photoset:
-				title = a.title[0].elementText.replace('/', ' ')
-				curdir = "/sets/" + title
-				if title.strip()=='':
-					curdir = "/sets/" + a['id']
-				set_id = a['id']
-				self._mkdir(curdir, id=set_id)
-				photos = self.transfl.fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=self.transfl.authtoken,
-					extras=self.extras)
-				retinfo = self.transfl.fapi.returntestFailure(photos)
-				if retinfo=="OK":
-					for b in photos.photoset[0].photo:
-						self._mkfileWithMeta(curdir, b)
+		for a in self.transfl.getPhotosetList():
+			title = a.title[0].elementText.replace('/', ' ')
+			curdir = "/sets/" + title
+			if title.strip()=='':
+				curdir = "/sets/" + a['id']
+			set_id = a['id']
+			self._mkdir(curdir, id=set_id)
+			for b in self.transfl.getPhotosFromPhotoset(set_id):
+				self._mkfileWithMeta(curdir, b)
 						
 						
 	#@-node:sets_thread
