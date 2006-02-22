@@ -99,6 +99,20 @@ class TransFlickr:  #Transactions with flickr
 
 	def __init__(self, flickrAPIKey, flickrSecret):
 		self.fapi = FlickrAPI(flickrAPIKey, flickrSecret)
+		# proceed with auth
+		# TODO use auth.checkToken function if available, and wait after opening browser
+		try:
+			self.authtoken = self.fapi.getToken(browser=browserName)
+		except:
+			print ("Can't retrieve token from browser:%s:"%(browserName,))
+			log.error(format_exc())
+			log.error("Can't retrieve token from browser:%s:"%(browserName,))
+			sys.exit(-1)
+		if self.authtoken == None:
+			log.error('Not able to authorize. Exiting...')
+			sys.exit(-1)
+	    		#Add some authorization checks here(?)
+		log.info('Authorization complete')
 
 	def uploadfile(self, filepath, taglist, bufData, mode):
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
@@ -106,7 +120,7 @@ class TransFlickr:  #Transactions with flickr
 		family = mode>>4 & 1
 		log.info("Uploading file: " + filepath + ":with data of len:" + str(len(bufData)))
 		log.info("Permissions:Family:%s Friends:%s Public:%s"%(family,friends,public))
-		rsp = self.fapi.upload(filename=filepath, jpegData=bufData, api_key=flickrAPIKey, auth_token=token, \
+		rsp = self.fapi.upload(filename=filepath, jpegData=bufData, api_key=flickrAPIKey, auth_token=self.authtoken, \
         	        title=os.path.splitext(os.path.basename(filepath))[0], \
                 	tags=taglist, \
                 	is_public=public and "1" or "0", \
@@ -125,7 +139,7 @@ class TransFlickr:  #Transactions with flickr
 				log.error(retinfo)
 	def put2Set(self, set_id, photo_id):
 		log.info("Uploading photo:"+photo_id+":to set_id:"+set_id)
-		rsp = self.fapi.photosets_addPhoto(api_key=flickrAPIKey, auth_token=token,\
+		rsp = self.fapi.photosets_addPhoto(api_key=flickrAPIKey, auth_token=self.authtoken,\
 				photoset_id=set_id, photo_id=photo_id)
 
 		retinfo = self.fapi.returntestFailure(rsp)
@@ -138,7 +152,7 @@ class TransFlickr:  #Transactions with flickr
 		log.info("Creating set:%s:with primary photo:%s:"%(path,photo_id))
 		ind = path.rindex('/')
 		title = path[ind+1:]
-		rsp = self.fapi.photosets_create(api_key=flickrAPIKey, auth_token=token,\
+		rsp = self.fapi.photosets_create(api_key=flickrAPIKey, auth_token=self.authtoken,\
 			title=title, primary_photo_id=photo_id)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo=="OK":
@@ -153,7 +167,7 @@ class TransFlickr:  #Transactions with flickr
 			log.info("The set is not existant online.")
 			return
 			
-		rsp = self.fapi.photosets_delete(api_key=flickrAPIKey, auth_token=token,\
+		rsp = self.fapi.photosets_delete(api_key=flickrAPIKey, auth_token=self.authtoken,\
 			photoset_id=set_id)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo=="OK":
@@ -163,7 +177,7 @@ class TransFlickr:  #Transactions with flickr
 	
 	def getPhotoInfo(self, photoId):
 		try:
-			rsp = self.fapi.photos_getInfo(photo_id=photoId, api_key=flickrAPIKey, auth_token=token)
+			rsp = self.fapi.photos_getInfo(photo_id=photoId, api_key=flickrAPIKey, auth_token=self.authtoken)
 		except:
 			return None
 		retinfo = self.fapi.returntestFailure(rsp)
@@ -204,7 +218,7 @@ class TransFlickr:  #Transactions with flickr
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
-		rsp = self.fapi.photos_setPerms(api_key=flickrAPIKey, auth_token=token, is_public=str(public),\
+		rsp = self.fapi.photos_setPerms(api_key=flickrAPIKey, auth_token=self.authtoken, is_public=str(public),\
 			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],\
 			perm_addmeta=comm_meta[1], photo_id=photoId)
 		retinfo = self.fapi.returntestFailure(rsp)
@@ -218,7 +232,7 @@ class TransFlickr:  #Transactions with flickr
 		templist = [ '"%s"'%(a,) for a in string.split(tags, ',')]
 		templist.append('flickrfs')
 		tagstring = ' '.join(templist)
-		rsp = self.fapi.photos_setTags(api_key=flickrAPIKey, auth_token=token, \
+		rsp = self.fapi.photos_setTags(api_key=flickrAPIKey, auth_token=self.authtoken, \
 			photo_id=photoId, tags=tagstring)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo != "OK":
@@ -228,7 +242,7 @@ class TransFlickr:  #Transactions with flickr
 		return True
 	
 	def setMeta(self, photoId, title, desc):
-		rsp = self.fapi.photos_setMeta(api_key=flickrAPIKey, auth_token=token, \
+		rsp = self.fapi.photos_setMeta(api_key=flickrAPIKey, auth_token=self.authtoken, \
 			photo_id=photoId, title=title, description=desc)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo != "OK":
@@ -239,7 +253,7 @@ class TransFlickr:  #Transactions with flickr
 
 	def getLicenses(self):
 		try:
-			rsp = self.fapi.photos_licenses_getInfo(api_key=flickrAPIKey, auth_token=token)
+			rsp = self.fapi.photos_licenses_getInfo(api_key=flickrAPIKey, auth_token=self.authtoken)
 		except:
 			return None
 		retinfo = self.fapi.returntestFailure(rsp)
@@ -253,7 +267,7 @@ class TransFlickr:  #Transactions with flickr
 		return licenseDict
 		
 	def setLicense(self, photoId, license):
-		rsp = self.fapi.photos_licenses_setLicense(api_key=flickrAPIKey, auth_token=token,\
+		rsp = self.fapi.photos_licenses_setLicense(api_key=flickrAPIKey, auth_token=self.authtoken,\
 			photo_id=photoId, license_id=license)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo != "OK":
@@ -264,7 +278,7 @@ class TransFlickr:  #Transactions with flickr
 
 	def getPhoto(self, photoId):
 		try:
-			rsp = self.fapi.photos_getSizes(photo_id=photoId, api_key=flickrAPIKey, auth_token=token)
+			rsp = self.fapi.photos_getSizes(photo_id=photoId, api_key=flickrAPIKey, auth_token=self.authtoken)
 		except:
 			log.error("Error while trying to retrieve size information:%s:"%(photoId,))
 			return ""
@@ -288,7 +302,7 @@ class TransFlickr:  #Transactions with flickr
 		return buf
 
 	def removePhotofromSet(self, photoId, photosetId):
-		rsp = self.fapi.photosets_removePhoto(api_key=flickrAPIKey, auth_token=token,\
+		rsp = self.fapi.photosets_removePhoto(api_key=flickrAPIKey, auth_token=self.authtoken,\
 			photo_id=photoId, photoset_id=photosetId)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo=="OK":
@@ -300,7 +314,7 @@ class TransFlickr:  #Transactions with flickr
 	def getBandwidthInfo(self):
 		log.debug("Retrieving bandwidth information")
 		try:
-			rsp = self.fapi.people_getUploadStatus(api_key=flickrAPIKey, auth_token=token)
+			rsp = self.fapi.people_getUploadStatus(api_key=flickrAPIKey, auth_token=self.authtoken)
 		except:
 			log.error("Error while trying to retrieve upload information")
 			return (None,None)
@@ -317,7 +331,7 @@ class TransFlickr:  #Transactions with flickr
 
 	def getUserId(self):
 		try:
-			rsp = self.fapi.auth_checkToken(api_key=flickrAPIKey, auth_token=token)
+			rsp = self.fapi.auth_checkToken(api_key=flickrAPIKey, auth_token=self.authtoken)
 		except:
 			log.error("Not able to retrieve user Id")
 			return None
@@ -397,25 +411,8 @@ class Flickrfs(Fuse):
 		self.inodeCache = {}  #Cached inodes for faster access
 #		self.listDir = {} #Store the file names inside the directory
 		self.NSID = ""
-    		global token
 		self.transfl = TransFlickr(flickrAPIKey, flickrSecret)
-		self.fapi = self.transfl.fapi
 
-		# proceed with auth
-		# TODO use auth.checkToken function if available, and wait after opening browser
-		try:
-			token = self.transfl.fapi.getToken(browser = browserName)
-		except:
-			print ("Can't retrieve token from browser:%s:"%(browserName,))
-			log.error("Can't retrieve token from browser:%s:"%(browserName,))
-			sys.exit(-1)
-
-		if token == None:
-			log.error('Not able to authorize. Exiting...')
-			sys.exit(-1)
-	    		#Add some authorization checks here(?)
-		log.info('Authorization complete')
-		
 		self.NSID = self.transfl.getUserId()
 		if self.NSID==None:
 			print "Can't retrieve user information"
@@ -467,7 +464,7 @@ class Flickrfs(Fuse):
         	"""    
 		log.info("sets_thread: started")
 		self._mkdir("/sets")
-		rsp = self.transfl.fapi.photosets_getList(api_key=flickrAPIKey, auth_token=token)
+		rsp = self.transfl.fapi.photosets_getList(api_key=flickrAPIKey, auth_token=self.transfl.authtoken)
 		retinfo = self.transfl.fapi.returntestFailure(rsp)
 		if retinfo!="OK":
 			return
@@ -479,7 +476,7 @@ class Flickrfs(Fuse):
 					curdir = "/sets/" + a['id']
 				set_id = a['id']
 				self._mkdir(curdir, id=set_id)
-				photos = self.transfl.fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=token,
+				photos = self.transfl.fapi.photosets_getPhotos(api_key=flickrAPIKey, photoset_id=set_id, auth_token=self.transfl.authtoken,
 					extras=self.extras)
 				retinfo = self.transfl.fapi.returntestFailure(photos)
 				if retinfo=="OK":
@@ -492,7 +489,7 @@ class Flickrfs(Fuse):
 	def stream_thread(self, path):
 		log.info("stream_thread started")
 		rsp = self.transfl.fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras,
-			auth_token=token)
+			auth_token=self.transfl.authtoken)
 		retinfo = self.transfl.fapi.returntestFailure(rsp)
 		if retinfo!="OK":
 			log.error("Can't retrive photos from your stream")
@@ -512,7 +509,7 @@ class Flickrfs(Fuse):
 		log.info("tags_thread:" + tagName + ":started")
 		sendtagList = ','.join(tagName.split(':'))
 		kw = kwdict(api_key=flickrAPIKey, tags=sendtagList, tag_mode="all", extras=self.extras, per_page="500")
-		if(path.startswith('/tags/personal')): kw = kwdict(user_id=self.NSID, auth_token=token, **kw)
+		if(path.startswith('/tags/personal')): kw = kwdict(user_id=self.NSID, auth_token=self.transfl.authtoken, **kw)
 		tags_rsp = self.transfl.fapi.photos_search(**kw)
 		log.debug("Search for photos with tag:" + sendtagList + ":done")
 		retinfo = self.transfl.fapi.returntestFailure(tags_rsp)
