@@ -365,6 +365,19 @@ class TransFlickr:  #Transactions with flickr
 		else:
 			log.error("Error getting photos from photoset %s: %s" % (photoset_id, retinfo))
 			return []
+                        
+	def getPhotoStream(self, user_id):
+		rsp = self.fapi.photos_search(api_key=flickrAPIKey, user_id=user_id, per_page="500", extras=self.extras,
+			auth_token=self.authtoken)
+		retinfo = self.fapi.returntestFailure(rsp)
+		if retinfo!="OK":
+			log.error("Can't retrive photos from your stream")
+			log.error("retinfo:%s"%(retinfo,))
+			return []
+		if not hasattr(rsp.photos[0], 'photo'):
+			return []
+		return rsp.photos[0].photo
+                
 
 
 class Inode(object):
@@ -501,16 +514,8 @@ class Flickrfs(Fuse):
 	
 	def stream_thread(self, path):
 		log.info("stream_thread started")
-		rsp = self.transfl.fapi.photos_search(api_key=flickrAPIKey, user_id=self.NSID, per_page="500", extras=self.extras,
-			auth_token=self.transfl.authtoken)
-		retinfo = self.transfl.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
-			log.error("Can't retrive photos from your stream")
-			log.error("retinfo:%s"%(retinfo,))
-			return
-		if hasattr(rsp.photos[0], 'photo'):
-			for b in rsp.photos[0].photo:
-				self._mkfileWithMeta(path, b)
+		for b in self.transfl.getPhotoStream(self.NSID):
+			self._mkfileWithMeta(path, b)
 			
 	
 	def tags_thread(self, path):
