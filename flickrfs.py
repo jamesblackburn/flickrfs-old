@@ -377,6 +377,20 @@ class TransFlickr:  #Transactions with flickr
 		if not hasattr(rsp.photos[0], 'photo'):
 			return []
 		return rsp.photos[0].photo
+ 
+	def getTaggedPhotos(self, tags, user_id=None):
+		kw = kwdict(api_key=flickrAPIKey, tags=tags, tag_mode="all", extras=self.extras, per_page="500")
+                if user_id is not None: kw = kwdict(user_id=user_id, auth_token=self.authtoken, **kw)
+		tags_rsp = self.fapi.photos_search(**kw)
+		log.debug("Search for photos with tags:" + tags + ":done")
+		retinfo = self.fapi.returntestFailure(tags_rsp)
+		if retinfo!="OK":
+			log.error("Couldn't search for the photos")
+			log.error("retinfo:%s"%(retinfo,))
+			return
+		if hasattr(tags_rsp.photos[0], 'photo'):
+			return tags_rsp.photos[0].photo
+		return []
                 
 
 
@@ -517,7 +531,6 @@ class Flickrfs(Fuse):
 		for b in self.transfl.getPhotoStream(self.NSID):
 			self._mkfileWithMeta(path, b)
 			
-	
 	def tags_thread(self, path):
 		ind = string.rindex(path, '/')
 		tagName = path[ind+1:]
@@ -526,18 +539,12 @@ class Flickrfs(Fuse):
 			return 
 		log.info("tags_thread:" + tagName + ":started")
 		sendtagList = ','.join(tagName.split(':'))
-		kw = kwdict(api_key=flickrAPIKey, tags=sendtagList, tag_mode="all", extras=self.extras, per_page="500")
-		if(path.startswith('/tags/personal')): kw = kwdict(user_id=self.NSID, auth_token=self.transfl.authtoken, **kw)
-		tags_rsp = self.transfl.fapi.photos_search(**kw)
-		log.debug("Search for photos with tag:" + sendtagList + ":done")
-		retinfo = self.transfl.fapi.returntestFailure(tags_rsp)
-		if retinfo!="OK":
-			log.error("Couldn't search for the photos")
-			log.error("retinfo:%s"%(retinfo,))
-			return
-		if hasattr(tags_rsp.photos[0], 'photo'):
-			for b in tags_rsp.photos[0].photo:
-				self._mkfileWithMeta(path, b)
+		if(path.startswith('/tags/personal')):
+			user_id = self.NSID
+                else:
+			user_id = None
+		for b in self.transfl.getTaggedPhotos(sendtagList, user_id):
+			self._mkfileWithMeta(path, b)
 
 	def _mkfileWithMeta(self, path, b):
 		INFO = self.transfl.getPhotoInfo(b['id'])
