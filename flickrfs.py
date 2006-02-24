@@ -92,10 +92,11 @@ class TransFlickr:  #Transactions with flickr
 
 	extras = "original_format,date_upload,last_update"
 
-	def __init__(self, flickrAPIKey, flickrSecret):
+	def __init__(self):
 		self.fapi = FlickrAPI(flickrAPIKey, flickrSecret)
 		# proceed with auth
 		# TODO use auth.checkToken function if available, and wait after opening browser
+	    	log.info("Authorizing with flickr...")
 		try:
 			self.authtoken = self.fapi.getToken(browser=browserName)
 		except:
@@ -434,22 +435,16 @@ class FileInode(Inode):
 
 class Flickrfs(Fuse):
 
-	extras = TransFlickr.extras
-    
     	def __init__(self, *args, **kw):
     
         	Fuse.__init__(self, *args, **kw)
-    
-        	if 1:
-            		log.info("flickrfs.py:Flickrfs:mountpoint: %s" % repr(self.mountpoint))
-            		log.info("flickrfs.py:Flickrfs:unnamed mount options: %s" % self.optlist)
-	       		log.info("flickrfs.py:Flickrfs:named mount options: %s" % self.optdict)
-	    		log.info("Authorizing with flickr...")
-	    		# initialise FlickrAPI object
+            	log.info("flickrfs.py:Flickrfs:mountpoint: %s" % repr(self.mountpoint))
+            	log.info("flickrfs.py:Flickrfs:unnamed mount options: %s" % self.optlist)
+	       	log.info("flickrfs.py:Flickrfs:named mount options: %s" % self.optdict)
 		
 		self.inodeCache = {}  #Cached inodes for faster access
 		self.NSID = ""
-		self.transfl = TransFlickr(flickrAPIKey, flickrSecret)
+		self.transfl = TransFlickr()
 
 		self.NSID = self.transfl.getUserId()
 		if self.NSID==None:
