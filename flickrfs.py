@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-#@+leo-ver=4
-#@+node:@file flickrfs.py
 #===============================================================================
 #	flickrfs - Virtual Filesystem for Flickr
 #    Copyright (c) 2005 Manish Rai Jain  <manishrjain@gmail.com>
@@ -13,9 +11,6 @@
 # author will not be liable for any misuse of this API Key/Shared Secret 
 # through this application/derived apps/any 3rd party apps using this key. 
 #===============================================================================
-#
-#@+others
-#@+node:imports
 
 from fuse import Fuse
 import os, sys
@@ -24,8 +19,6 @@ from stat import *
 from traceback import format_exc
 
 import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codecs
-#@-node:imports
-#@+node:class Xmp
 
 #Some global definitions and functions
 
@@ -441,11 +434,8 @@ class FileInode(Inode):
 
 class Flickrfs(Fuse):
 
-	#@@+others
-
 	extras = TransFlickr.extras
     
-	#@+node:__init__
     	def __init__(self, *args, **kw):
     
         	Fuse.__init__(self, *args, **kw)
@@ -458,7 +448,6 @@ class Flickrfs(Fuse):
 	    		# initialise FlickrAPI object
 		
 		self.inodeCache = {}  #Cached inodes for faster access
-#		self.listDir = {} #Store the file names inside the directory
 		self.NSID = ""
 		self.transfl = TransFlickr(flickrAPIKey, flickrSecret)
 
@@ -504,8 +493,6 @@ class Flickrfs(Fuse):
 		f.write("%s:%s\n"%('license',INFO[6]))
 		f.close()
 
-
-	#@+node:sets_thread
 	def sets_thread(self):
 		"""
         	The beauty of the FUSE python implementation is that with the python interp
@@ -522,9 +509,6 @@ class Flickrfs(Fuse):
 			self._mkdir(curdir, id=set_id)
 			for b in self.transfl.getPhotosFromPhotoset(set_id):
 				self._mkfileWithMeta(curdir, b)
-						
-						
-	#@-node:sets_thread
 	
 	def stream_thread(self, path):
 		log.info("stream_thread started")
@@ -561,10 +545,6 @@ class Flickrfs(Fuse):
 		self.writeMetaInfo(b['id'], INFO) #Write to a localfile
 		self._mkfile(path +"/" + title, id=b['id'],\
 			mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
-	
-	#@+node:attribs
-    	flags = 1
-	#@-node:attribs
 
 	def _parsepathid(self, path, id=""):
 		#Path and Id may be unicode strings, so encode them to utf8 now before
@@ -602,7 +582,6 @@ class Flickrfs(Fuse):
 			size = os.path.getsize(datapath)
 			self.inodeCache[path] = FileInode(path, id, size=size)
 
-	#@+node:getattr
     	def getattr(self, path):
     		log.debug("getattr:" + path + ":")
 		if path.startswith('/sets/'):
@@ -625,18 +604,12 @@ class Flickrfs(Fuse):
             		e.errno = ENOENT
            		raise e
 
-	#@-node:getattr
-
-	#@+node:readlink
     	def readlink(self, path):
     		log.debug("readlink")
     		return os.readlink(path)
-    	#@-node:readlink
 	
-    	#@+node:getdir
     	def getdir(self, path):
     		log.debug("getdir:" + path)
-#		return map(lambda x: (x,0),  self.listDir[path])
 		templist = ['.', '..']
 		for a in self.inodeCache.keys():
 			ind = a.rindex('/')
@@ -648,9 +621,6 @@ class Flickrfs(Fuse):
 					templist.append(name)
 		return map(lambda x: (x,0), templist)
 
-    	#@-node:getdir
-	
-    	#@+node:unlink
     	def unlink(self, path):
     		log.debug("unlink:%s:" % (path))
 		if self.inodeCache.has_key(path):
@@ -673,9 +643,7 @@ class Flickrfs(Fuse):
 			#Dont' raise an exception. Not useful when
 			#using editors like Vim. They make loads of 
 			#crap buffer files
-    	#@-node:unlink
 	
-    	#@+node:rmdir
     	def rmdir(self, path):
 		log.debug("rmdir:%s:"%(path))
 		if self.inodeCache.has_key(path):
@@ -713,17 +681,11 @@ class Flickrfs(Fuse):
 			e = OSError("Removal of folder %s not allowed" % (path))
 			e.errno = EPERM
 			raise e
-			
-	#    	return os.rmdir(path)	
-	#@-node:rmdir
 	
-    	#@+node:symlink
     	def symlink(self, path, path1):
     		log.debug("symlink")
     		return os.symlink(path, path1)	
-    	#@-node:symlink
     
-    	#@+node:rename
    	def rename(self, path, path1):
 		log.debug("rename:path:%s:to path1:%s:"%(path,path1))
 		#Donot allow Vim to create a file~
@@ -755,16 +717,10 @@ class Flickrfs(Fuse):
 		retinfo = self.parse(fname, inode.photoId)
 		if retinfo.count('Error')>0:
 			log.error(retinfo)
-#    		return os.rename(path, path1)
-	#@-node:rename
 	    
-	#@+node:link
 	def link(self, path, path1):
 		log.debug("link")
-#    		return os.link(path, path1)
-	#@-node:link
 	    
-	#@+node:chmod
 	def chmod(self, path, mode):
 		log.debug("chmod. Oh! So, you found use as well!")
 		inode = self.getInode(path)
@@ -781,17 +737,11 @@ class Flickrfs(Fuse):
 
 		if self.transfl.setPerm(inode.photoId, mode, inode.comm_meta)==True:
 			inode.mode = mode
-	#@-node:chmod
 	    
-	#@+node:chown
 	def chown(self, path, user, group):
 		log.debug("chown. Are you of any use in flickrfs?")
-	#    	return os.chown(path, user, group)
-	#@-node:chown
 	    
-	#@+node:truncate
 	def truncate(self, path, size):
-	#   	log.debug("truncate?? WTF for?")
 		log.debug("truncate?? Okay okay! I accept your usage:%s:%s"%(path,size))
 		ind = path.rindex('/')
 		name_file = path[ind+1:]
@@ -802,11 +752,7 @@ class Flickrfs(Fuse):
 			filePath = os.path.join(flickrfsHome, '.'+inode.photoId)
 			f = open(filePath, 'w+')
 			return f.truncate(size)
-	#    	f = open(path, "w+")
-	#    	return f.truncate(size)
-	#@-node:truncate
 	    
-	#@+node:mknod
 	def mknod(self, path, mode, dev):
 		""" Python has no os.mknod, so we can only do some things """
 		log.debug("mknod? OK! Had a close encounter!!:%s:"%(path,))
@@ -838,14 +784,7 @@ class Flickrfs(Fuse):
 		else:
 			self._mkfile(path, id="NEW", mode=mode)
 
-#    		if S_ISREG(mode):
-#    			open(path, "w")
-#    		else:
-#    			return -EINVAL
-    	#@-node:mknod
-    	#@+node:mkdir
     	def mkdir(self, path, mode):
-#    		return os.mkdir(path, mode)
 		log.debug("mkdir:" + path + ":")
 		if path.startswith("/tags"):
 			if path.count('/')==3:   #/tags/personal (or private)/dirname ONLY
@@ -872,17 +811,12 @@ class Flickrfs(Fuse):
 			e.errno = EACCES
 			raise e
 			
-
-    	#@-node:mkdir
-    	#@+node:utime
     	def utime(self, path, times):
 		inode = self.getInode(path)
 		inode.atime = times[0]
 		inode.mtime = times[1]
-#    		return os.utime(path, times)
 		return 0
-    	#@-node:utime
-    	#@+node:open
+
     	def open(self, path, flags):
 		log.info("open: " + path)
 		ind = path.rindex('/')
@@ -914,8 +848,6 @@ class Flickrfs(Fuse):
 			log.debug("Size of image: " + str(inode.size))
 		return 0
 	    
-	#@-node:open
-	#@+node:read
 	def read(self, path, len, offset):
 		log.debug("read:%s:offset:%s:len:%s:"%(path,offset,len))
 		inode = self.getInode(path)
@@ -946,8 +878,6 @@ class Flickrfs(Fuse):
 			del inode.buf
 			inode.buf=""
 		return temp
-    
-	#@-node:read
 
 	def parse(self, fname, photoId):
 		cp = ConfigParser.ConfigParser()
@@ -985,7 +915,6 @@ class Flickrfs(Fuse):
 			return "Error:Can't parse"
 		return 'Success:Updated photo:%s:%s:'%(fname,photoId)
 
-    	#@+node:write
     	def write(self, path, buf, off):
 		log.debug("write:" + path)
 		
@@ -1081,9 +1010,7 @@ class Flickrfs(Fuse):
 					self.transfl.put2Set(pinode.setId, id)
 				
     		return len(buf)
-	#@-node:write
 
-	#@+node:getInode
 	def getInode(self, path):
 		if self.inodeCache.has_key(path):
 			log.debug("Got cached inode: " + path)
@@ -1092,15 +1019,11 @@ class Flickrfs(Fuse):
 			log.debug("No inode??? I DIE!!!")
 			return None
 
-	#@-node:getInode
 
-	#@+node:release
 	def release(self, path, flags):
 	        log.debug("flickrfs.py:Flickrfs:release: %s %s" % (path,flags))
 	        return 0
-	#@-node:release
 	
-	#@+node:statfs
     	def statfs(self):
         	"""
         Should return a tuple with the following elements in respective order:
@@ -1138,15 +1061,13 @@ class Flickrfs(Fuse):
 			log.debug('blocks_free:%s'%(blocks_free))
         	return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user, \
 			files, files_free, files_free_user, namelen)
-	#@-node:statfs
-	#@+node:fsync
+
 	def fsync(self, path, isfsyncfile):
 	        log.debug("flickrfs.py:Flickrfs:fsync: path=%s, isfsyncfile=%s"%(path,isfsyncfile))
 	        return 0
     
-	#@-node:fsync
 
-#@+node:mainline
+
 if __name__ == '__main__':
 	try:
 		server = Flickrfs()
@@ -1155,5 +1076,3 @@ if __name__ == '__main__':
 	except KeyError:
 		log.error('Got key error. Exiting...')
 		sys.exit(0)
-#@-node:mainline
-#@-leo
