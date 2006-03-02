@@ -91,6 +91,18 @@ class XMLNode:
 		"""Retrieve a node's attribute from the attrib hash."""
 		return self.attrib[key]
 
+	# Modified here: add a couple of methods to make it even easier to handle errors.
+	# Mod by: R. David Murray <rdmurray@bitdance.com>
+	def __nonzero__(self):
+		if self['stat'] == "fail": return False
+		return True
+
+	def get_errortext(self):
+		if self: return ''
+		return "%s: error %s: %s\n" % (self.elementName, \
+				self.err[0]['code'], self.err[0]['msg'])
+	errormsg = property(get_errortext)
+
 	#-----------------------------------------------------------------------
 	#@classmethod
 	def parseXML(cls, xmlStr="", storeXML=False):
@@ -359,16 +371,6 @@ class FlickrAPI:
 				rsp.err[0]['code'], rsp.err[0]['msg']))
 			if exit: sys.exit(1)
 
-	#@classmethod
-	# Added by Manish Rai Jain <manishrjain@gmail.com> for a return of the error
-	# to the software calling this method externally. 
-	def returntestFailure(cls, rsp):
-		"""Exit app if the rsp XMLNode indicates failure."""
-		if rsp['stat'] == "fail":
-			return "%s: error %s: %s\n" % (rsp.elementName, \
-				rsp.err[0]['code'], rsp.err[0]['msg'])
-		else:
-			return 'OK'
 	#-----------------------------------------------------------------------
 	def __getCachedTokenPath(self):
 		"""Return the directory holding the app data."""

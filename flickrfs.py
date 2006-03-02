@@ -122,38 +122,33 @@ class TransFlickr:  #Transactions with flickr
                 	is_public=public and "1" or "0",
                 	is_friend=friends and "1" or "0",
                 	is_family=family and "1" or "0")
-
 		if rsp==None:
 			log.error("Can't write file: " + filepath)
+		elif rsp:
+			id = rsp.photoid[0].elementText
+			log.info("File uploaded:" + filepath + ":with photoid:" + id + ":")
+			return id
 		else:
-			retinfo = self.fapi.returntestFailure(rsp)
-			if retinfo=="OK":
-				id = rsp.photoid[0].elementText
-				log.info("File uploaded:" + filepath + ":with photoid:" + id + ":")
-				return id
-			else:
-				log.error(retinfo)
+			log.error(rsp.errormsg)
+
 	def put2Set(self, set_id, photo_id):
 		log.info("Uploading photo:"+photo_id+":to set_id:"+set_id)
 		rsp = self.fapi.photosets_addPhoto(photoset_id=set_id, photo_id=photo_id)
-
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo=="OK":
+		if rsp:
 			log.info("Uploaded photo to set")
 		else:
-			log.error(retinfo)
+			log.error(rsp.errormsg)
 	
 	def createSet(self, path, photo_id):
 		log.info("Creating set:%s:with primary photo:%s:"%(path,photo_id))
 		ind = path.rindex('/')
 		title = path[ind+1:]
 		rsp = self.fapi.photosets_create(title=title, primary_photo_id=photo_id)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo=="OK":
+		if rsp:
 			log.info("Created set:%s:"%(title))
 			return rsp.photoset[0]['id']
 		else:
-			log.error(retinfo)
+			log.error(rsp.errormsg)
 	
 	def deleteSet(self, set_id):
 		log.info("Deleting set:%s:"%(set_id))
@@ -162,20 +157,19 @@ class TransFlickr:  #Transactions with flickr
 			return
 			
 		rsp = self.fapi.photosets_delete(photoset_id=set_id)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo=="OK":
+		if rsp:
 			log.info("Deleted set")
 		else:
-			log.error(retinfo)
+			log.error(rsp.errormsg)
 	
 	def getPhotoInfo(self, photoId):
 		try:
 			rsp = self.fapi.photos_getInfo(photo_id=photoId)
 		except:
 			return None
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
-			log.error("Can't retrieve information about photo: " + photoId)
+		if not rsp:
+			log.error("Can't retrieve information about photo: " + rsp.errormsg)
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return None
 		format = rsp.photo[0]['originalformat']
 		perm_public = rsp.photo[0].visibility[0]['ispublic']
@@ -214,9 +208,8 @@ class TransFlickr:  #Transactions with flickr
 		rsp = self.fapi.photos_setPerms(is_public=str(public),
 			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],
 			perm_addmeta=comm_meta[1], photo_id=photoId)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo != "OK":
-			log.error("Couldn't set permission:%s:"%(photoId,))
+		if not rsp:
+			log.error("Couldn't set permission:%s:%s"%(photoId,rsp.errormsg))
 			return False
 		else:
 			return True
@@ -226,19 +219,17 @@ class TransFlickr:  #Transactions with flickr
 		templist.append('flickrfs')
 		tagstring = ' '.join(templist)
 		rsp = self.fapi.photos_setTags(photo_id=photoId, tags=tagstring)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo != "OK":
+		if not rsp:
 			log.error("Couldn't set tags:%s:"%(photoId,))
-			log.error("setTags: retinfo:%s"%(retinfo,))
+			log.error("setTags: retinfo:%s"%(rsp.errormsg,))
 			return False
 		return True
 	
 	def setMeta(self, photoId, title, desc):
 		rsp = self.fapi.photos_setMeta(photo_id=photoId, title=title, description=desc)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo != "OK":
+		if not rsp:
 			log.error("Couldn't set meta info:%s:"%(photoId,))
-			log.error("retinfo:%s"%(retinfo,))
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return False
 		return True
 
@@ -247,22 +238,19 @@ class TransFlickr:  #Transactions with flickr
 			rsp = self.fapi.photos_licenses_getInfo()
 		except:
 			return None
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo != "OK":
-			log.error("retinfo:%s"%(retinfo,))
+		if not rsp:
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return None
 		licenseDict = {}
 		for l in rsp.licenses[0].license:
 			licenseDict[l['id']] = l['name']
-
 		return licenseDict
 		
 	def setLicense(self, photoId, license):
 		rsp = self.fapi.photos_licenses_setLicense(photo_id=photoId, license_id=license)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo != "OK":
+		if not rsp:
 			log.error("Couldn't set license info:%s:"%(photoId,))
-			log.error("retinfo:%s"%(retinfo,))
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return False
 		return True
 
@@ -273,8 +261,7 @@ class TransFlickr:  #Transactions with flickr
 			log.error("Error while trying to retrieve size information:%s:"%(photoId,))
 			return ""
 
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
+		if not rsp:
 			log.error("Can't get information about photo: " + photoId)
 			return None
 		buf = ""
@@ -293,11 +280,10 @@ class TransFlickr:  #Transactions with flickr
 
 	def removePhotofromSet(self, photoId, photosetId):
 		rsp = self.fapi.photosets_removePhoto(photo_id=photoId, photoset_id=photosetId)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo=="OK":
+		if rsp:
 			log.info("Photo removed from set")
 		else:
-			log.error(retinfo)
+			log.error(rsp.errormsg)
 			
 		
 	def getBandwidthInfo(self):
@@ -307,15 +293,13 @@ class TransFlickr:  #Transactions with flickr
 		except:
 			log.error("Error while trying to retrieve upload information")
 			return (None,None)
-
-		retinfo = self.fapi.returntestFailure(rsp)
-		bw = rsp.user[0].bandwidth[0]
-		log.debug("Bandwidth: max:" + bw['max'])
-		log.debug("Bandwidth: used:" + bw['used'])
-		if retinfo=="OK":
+		if rsp:
+			bw = rsp.user[0].bandwidth[0]
+			log.debug("Bandwidth: max:" + bw['max'])
+			log.debug("Bandwidth: used:" + bw['used'])
 			return (bw['max'], bw['used'])
 		else:
-			log.error("Can't retrieve bandwidth information")
+			log.error("Can't retrieve bandwidth information: %s" % rsp.errormsg)
 			return (None,None)
 
 	def getUserId(self):
@@ -325,8 +309,7 @@ class TransFlickr:  #Transactions with flickr
 			log.error("Not able to retrieve user Id")
 			return None
 
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo=="OK":
+		if rsp:
 			usr = rsp.auth[0].user[0]
 			log.info("Got NSID:"+ usr['nsid'] + ":")
 			return usr['nsid']
@@ -335,29 +318,26 @@ class TransFlickr:  #Transactions with flickr
 
 	def getPhotosetList(self):
 		rsp = self.fapi.photosets_getList()
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
-			log.error("Error getting photoset list: %s" % (retinfo))
+		if not rsp:
+			log.error("Error getting photoset list: %s" % (rsp.errormsg))
 			return []
 		if not hasattr(rsp.photosets[0], "photoset"):
 			return []
 		return rsp.photosets[0].photoset
 
 	def getPhotosFromPhotoset(self, photoset_id):
-		photos = self.fapi.photosets_getPhotos(photoset_id=photoset_id, extras=self.extras)
-		retinfo = self.fapi.returntestFailure(photos)
-		if retinfo=="OK":
-			return photos.photoset[0].photo
+		rsp = self.fapi.photosets_getPhotos(photoset_id=photoset_id, extras=self.extras)
+		if rsp:
+			return rsp.photoset[0].photo
 		else:
-			log.error("Error getting photos from photoset %s: %s" % (photoset_id, retinfo))
+			log.error("Error getting photos from photoset %s: %s" % (photoset_id, rsp.errormsg))
 			return []
                         
 	def getPhotoStream(self, user_id):
 		rsp = self.fapi.photos_search(user_id=user_id, per_page="500", extras=self.extras)
-		retinfo = self.fapi.returntestFailure(rsp)
-		if retinfo!="OK":
+		if not rsp:
 			log.error("Can't retrive photos from your stream")
-			log.error("retinfo:%s"%(retinfo,))
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return []
 		if not hasattr(rsp.photos[0], 'photo'):
 			return []
@@ -366,15 +346,14 @@ class TransFlickr:  #Transactions with flickr
 	def getTaggedPhotos(self, tags, user_id=None):
 		kw = kwdict(tags=tags, tag_mode="all", extras=self.extras, per_page="500")
 		if user_id is not None: kw = kwdict(user_id=user_id, **kw)
-		tags_rsp = self.fapi.photos_search(**kw)
+		rsp = self.fapi.photos_search(**kw)
 		log.debug("Search for photos with tags:" + tags + ":done")
-		retinfo = self.fapi.returntestFailure(tags_rsp)
-		if retinfo!="OK":
+		if not rsp:
 			log.error("Couldn't search for the photos")
-			log.error("retinfo:%s"%(retinfo,))
+			log.error("retinfo:%s"%(rsp.errormsg,))
 			return
-		if hasattr(tags_rsp.photos[0], 'photo'):
-			return tags_rsp.photos[0].photo
+		if hasattr(rsp.photos[0], 'photo'):
+			return rsp.photos[0].photo
 		return []
                 
 
