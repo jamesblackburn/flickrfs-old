@@ -117,10 +117,10 @@ class TransFlickr:  #Transactions with flickr
 		log.info("Uploading file: " + filepath + ":with data of len:" + str(len(bufData)))
 		log.info("Permissions:Family:%s Friends:%s Public:%s"%(family,friends,public))
 		rsp = self.fapi.upload(filename=filepath, jpegData=bufData,
-        	        title=os.path.splitext(os.path.basename(filepath))[0], \
-                	tags=taglist, \
-                	is_public=public and "1" or "0", \
-                	is_friend=friends and "1" or "0", \
+        	        title=os.path.splitext(os.path.basename(filepath))[0],
+                	tags=taglist,
+                	is_public=public and "1" or "0",
+                	is_friend=friends and "1" or "0",
                 	is_family=family and "1" or "0")
 
 		if rsp==None:
@@ -211,8 +211,8 @@ class TransFlickr:  #Transactions with flickr
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
-		rsp = self.fapi.photos_setPerms(is_public=str(public),\
-			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],\
+		rsp = self.fapi.photos_setPerms(is_public=str(public),
+			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],
 			perm_addmeta=comm_meta[1], photo_id=photoId)
 		retinfo = self.fapi.returntestFailure(rsp)
 		if retinfo != "OK":
@@ -365,7 +365,7 @@ class TransFlickr:  #Transactions with flickr
  
 	def getTaggedPhotos(self, tags, user_id=None):
 		kw = kwdict(tags=tags, tag_mode="all", extras=self.extras, per_page="500")
-                if user_id is not None: kw = kwdict(user_id=user_id, **kw)
+		if user_id is not None: kw = kwdict(user_id=user_id, **kw)
 		tags_rsp = self.fapi.photos_search(**kw)
 		log.debug("Search for photos with tags:" + tags + ":done")
 		retinfo = self.fapi.returntestFailure(tags_rsp)
@@ -529,7 +529,7 @@ class Flickrfs(Fuse):
 		if os.path.splitext(title)[1]!=ext:
 			title = title + ext
 		self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-		self._mkfile(path +"/" + title, id=b['id'],\
+		self._mkfile(path +"/" + title, id=b['id'],
 			mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
 
 	def _parsepathid(self, path, id=""):
@@ -581,7 +581,7 @@ class Flickrfs(Fuse):
 		inode=self.getInode(path)
         	if inode:
 			log.debug("inode "+str(inode))
-            		statTuple = (inode.mode,inode.ino,inode.dev,inode.nlink, \
+            		statTuple = (inode.mode,inode.ino,inode.dev,inode.nlink,
 				inode.uid,inode.gid,inode.size,inode.atime,inode.mtime,inode.ctime)
                 	log.debug("statsTuple "+str(statTuple))
             		return statTuple
@@ -1045,7 +1045,7 @@ class Flickrfs(Fuse):
 			blocks_free_user = blocks_free
 			log.debug('total blocks:%s'%(total_blocks))
 			log.debug('blocks_free:%s'%(blocks_free))
-        	return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user, \
+        	return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user,
 			files, files_free, files_free_user, namelen)
 
 	def fsync(self, path, isfsyncfile):
