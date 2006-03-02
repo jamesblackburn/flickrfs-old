@@ -39,6 +39,7 @@
 # If you are interested in finding out exactly
 # what portions I have modified, just search for 'manish'. Each change is 
 # tagged with my name for easy locate. 
+# Additional modifications similarly tagged by R. David Murray <rdmurray@bitdance.com>
 
 import sys
 import md5
@@ -214,6 +215,10 @@ class FlickrAPI:
 				url = "http://" + FlickrAPI.flickrHost + \
 					FlickrAPI.flickrRESTForm
 				arg["method"] = _method
+				# Modified here: use default api_key and auth_token if not supplied
+				# Mod by: R. David Murray <rdmurray@bitdance.com>
+				if not 'api_key' in arg: arg["api_key"] = _self.apiKey
+				if not 'auth_token' in arg and hasattr(_self, 'token'): arg['auth_token'] = _self.token
 				postData = urllib.urlencode(arg) + "&api_sig=" + \
 					_self.__sign(arg)
 				#print "--url---------------------------------------------"
@@ -282,6 +287,10 @@ class FlickrAPI:
 				sys.stderr.write("FlickrAPI: warning: unknown parameter " \
 					"\"%s\" sent to FlickrAPI.upload\n" % (a))
 		
+		# Modified here: use default api_key and auth_token if not supplied
+		# Mod by: R. David Murray <rdmurray@bitdance.com>
+		if not 'api_key' in arg: arg["api_key"] = self.apiKey
+		if not 'auth_token' in arg: arg['auth_token'] = self.token
 		arg["api_sig"] = self.__sign(arg)
 		url = "http://" + FlickrAPI.flickrHost + FlickrAPI.flickrUploadForm
 
@@ -463,6 +472,9 @@ class FlickrAPI:
 			# store the auth info for next time
 			self.__setCachedToken(rsp.xml)
 
+		# Modified here: save the auth token to use as a default
+		# Mod by: R. David Murray <rdmurray@bitdance.com>
+		self.token = token
 		return token
 
 
