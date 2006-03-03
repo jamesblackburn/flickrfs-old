@@ -130,8 +130,7 @@ class TransFlickr:
 	
 	def createSet(self, path, photo_id):
 		log.info("Creating set:%s:with primary photo:%s:"%(path,photo_id))
-		ind = path.rindex('/')
-		title = path[ind+1:]
+                path, title = os.path.split(path)
 		rsp = self.fapi.photosets_create(title=title, primary_photo_id=photo_id)
 		if rsp:
 			log.info("Created set:%s:"%(title))
@@ -142,9 +141,8 @@ class TransFlickr:
 	def deleteSet(self, set_id):
 		log.info("Deleting set:%s:"%(set_id))
 		if str(set_id)=="0":
-			log.info("The set is not existant online.")
+			log.info("The set is non-existant online.")
 			return
-			
 		rsp = self.fapi.photosets_delete(photoset_id=set_id)
 		if rsp:
 			log.info("Deleted set")
@@ -152,10 +150,7 @@ class TransFlickr:
 			log.error(rsp.errormsg)
 	
 	def getPhotoInfo(self, photoId):
-		try:
-			rsp = self.fapi.photos_getInfo(photo_id=photoId)
-		except:
-			return None
+		rsp = self.fapi.photos_getInfo(photo_id=photoId)
 		if not rsp:
 			log.error("Can't retrieve information about photo: " + rsp.errormsg)
 			log.error("retinfo:%s"%(rsp.errormsg,))
@@ -174,7 +169,6 @@ class TransFlickr:
 				b_cnt += 1
 			mode = "07" + str(b_cnt) + "4"
 			mode = int(mode)
-
 		if hasattr(rsp.photo[0],'permissions'):
 			permcomment = rsp.photo[0].permissions[0]['permcomment']
 			permaddmeta = rsp.photo[0].permissions[0]['permaddmeta']
@@ -182,12 +176,11 @@ class TransFlickr:
 		commMeta = permcomment + permaddmeta #Just add both. Required for chmod
 		desc = rsp.photo[0].description[0].elementText
 		title = rsp.photo[0].title[0].elementText
-		taglist = []
 		if hasattr(rsp.photo[0].tags[0], "tag"):
-			for a in rsp.photo[0].tags[0].tag:
-				taglist.append(a.elementText)
+			taglist = [ a.elementText for a in rsp.photo[0].tags[0].tag ]
+		else:
+			taglist = []
 		license = rsp.photo[0]['license']
-		# (format, mode, commMeta, desc, title, taglist, license)
 		return (format, mode, commMeta, desc, title, taglist, license)
 
 	def setPerm(self, photoId, mode, comm_meta):
@@ -200,12 +193,10 @@ class TransFlickr:
 		if not rsp:
 			log.error("Couldn't set permission:%s:%s"%(photoId,rsp.errormsg))
 			return False
-		else:
-			return True
+		return True
 
 	def setTags(self, photoId, tags):
-		templist = [ '"%s"'%(a,) for a in string.split(tags, ',')]
-		templist.append('flickrfs')
+		templist = [ '"%s"'%(a,) for a in string.split(tags, ',')] + ['flickrfs']
 		tagstring = ' '.join(templist)
 		rsp = self.fapi.photos_setTags(photo_id=photoId, tags=tagstring)
 		if not rsp:
@@ -223,10 +214,7 @@ class TransFlickr:
 		return True
 
 	def getLicenses(self):
-		try:
-			rsp = self.fapi.photos_licenses_getInfo()
-		except:
-			return None
+		rsp = self.fapi.photos_licenses_getInfo()
 		if not rsp:
 			log.error("retinfo:%s"%(rsp.errormsg,))
 			return None
@@ -244,14 +232,9 @@ class TransFlickr:
 		return True
 
 	def getPhoto(self, photoId):
-		try:
-			rsp = self.fapi.photos_getSizes(photo_id=photoId)
-		except:
-			log.error("Error while trying to retrieve size information:%s:"%(photoId,))
-			return ""
-
+		rsp = self.fapi.photos_getSizes(photo_id=photoId)
 		if not rsp:
-			log.error("Can't get information about photo: " + photoId)
+			log.error("Error while trying to retrieve size information:%s:"%(photoId,))
 			return None
 		buf = ""
 		for a in rsp.sizes[0].size:
@@ -261,6 +244,7 @@ class TransFlickr:
 					buf = f.read()
 				except:
 					log.error("Exception in getPhoto")
+					log.error(format_exc())
 					return ""
 		if not buf:
 			f = urllib2.urlopen(rsp.sizes[0].size[-1]['source'])
@@ -270,40 +254,30 @@ class TransFlickr:
 	def removePhotofromSet(self, photoId, photosetId):
 		rsp = self.fapi.photosets_removePhoto(photo_id=photoId, photoset_id=photosetId)
 		if rsp:
-			log.info("Photo removed from set")
+			log.info("Photo %s removed from set %s" % (photoId, photosetId))
 		else:
 			log.error(rsp.errormsg)
 			
 		
 	def getBandwidthInfo(self):
 		log.debug("Retrieving bandwidth information")
-		try:
-			rsp = self.fapi.people_getUploadStatus()
-		except:
-			log.error("Error while trying to retrieve upload information")
-			return (None,None)
-		if rsp:
-			bw = rsp.user[0].bandwidth[0]
-			log.debug("Bandwidth: max:" + bw['max'])
-			log.debug("Bandwidth: used:" + bw['used'])
-			return (bw['max'], bw['used'])
-		else:
+		rsp = self.fapi.people_getUploadStatus()
+		if not rsp:
 			log.error("Can't retrieve bandwidth information: %s" % rsp.errormsg)
 			return (None,None)
+		bw = rsp.user[0].bandwidth[0]
+		log.debug("Bandwidth: max:" + bw['max'])
+		log.debug("Bandwidth: used:" + bw['used'])
+		return (bw['max'], bw['used'])
 
 	def getUserId(self):
-		try:
-			rsp = self.fapi.auth_checkToken()
-		except:
-			log.error("Not able to retrieve user Id")
-			return None
-
-		if rsp:
-			usr = rsp.auth[0].user[0]
-			log.info("Got NSID:"+ usr['nsid'] + ":")
-			return usr['nsid']
-		else:
-			return None
+		rsp = self.fapi.auth_checkToken()
+                if not rsp:
+                    log.error("Unable to get userid:" + rsp.errormsg)
+                    return None
+		usr = rsp.auth[0].user[0]
+		log.info("Got NSID:"+ usr['nsid'] + ":")
+		return usr['nsid']
 
 	def getPhotosetList(self):
 		rsp = self.fapi.photosets_getList()
@@ -316,17 +290,15 @@ class TransFlickr:
 
 	def getPhotosFromPhotoset(self, photoset_id):
 		rsp = self.fapi.photosets_getPhotos(photoset_id=photoset_id, extras=self.extras)
-		if rsp:
-			return rsp.photoset[0].photo
-		else:
+		if not rsp:
 			log.error("Error getting photos from photoset %s: %s" % (photoset_id, rsp.errormsg))
 			return []
+		return rsp.photoset[0].photo
                         
 	def getPhotoStream(self, user_id):
 		rsp = self.fapi.photos_search(user_id=user_id, per_page="500", extras=self.extras)
 		if not rsp:
-			log.error("Can't retrive photos from your stream")
-			log.error("retinfo:%s"%(rsp.errormsg,))
+			log.error("Can't retrive photos from your stream:" + rsp.errormsg)
 			return []
 		if not hasattr(rsp.photos[0], 'photo'):
 			return []
@@ -338,12 +310,11 @@ class TransFlickr:
 		rsp = self.fapi.photos_search(**kw)
 		log.debug("Search for photos with tags:" + tags + ":done")
 		if not rsp:
-			log.error("Couldn't search for the photos")
-			log.error("retinfo:%s"%(rsp.errormsg,))
+			log.error("Couldn't search for the photos:" + rsp.errormsg)
 			return
-		if hasattr(rsp.photos[0], 'photo'):
-			return rsp.photos[0].photo
-		return []
+		if not hasattr(rsp.photos[0], 'photo'):
+			return []
+		return rsp.photos[0].photo
                 
 
 
