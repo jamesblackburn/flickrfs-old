@@ -27,12 +27,10 @@ DEFAULTBLOCKSIZE = 4*1024  #4KB
 # Setup logging
 import time, logging, logging.handlers
 log = logging.getLogger('flickrfs')
-try:
-	homedir = os.getenv('HOME')
-	flickrfsHome = os.path.join(homedir, '.flickrfs')
+homedir = os.getenv('HOME')
+flickrfsHome = os.path.join(homedir, '.flickrfs')
+if not os.path.exists(flickrfsHome):
 	os.mkdir(os.path.join(flickrfsHome))
-except:
-	pass	#Directory already exists
 
 # Remove previous metadata files from ~/.flickrfs
 import glob
