@@ -12,22 +12,24 @@
 # through this application/derived apps/any 3rd party apps using this key. 
 #===============================================================================
 
-from fuse import Fuse
-import os, sys
+import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codecs
+import time, logging, logging.handlers, os, sys
+from glob import glob
 from errno import *
 from stat import *
 from traceback import format_exc
-from glob import glob
+from fuse import Fuse
+from flickrapi import FlickrAPI
 
-import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codecs
 
 #Some global definitions and functions
-
 DEFAULTBLOCKSIZE = 4*1024  #4KB
+# flickr auth information
+flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
+flickrSecret = "3fbf7144be7eca28"                  # shared "secret"
+browserName = "/usr/bin/firefox"                   # for out-of-band auth inside a web browser
 
-# Setup logging
-import time, logging, logging.handlers
-log = logging.getLogger('flickrfs')
+#Set up the .flickfs directory.
 homedir = os.getenv('HOME')
 flickrfsHome = os.path.join(homedir, '.flickrfs')
 if not os.path.exists(flickrfsHome):
@@ -37,21 +39,13 @@ else:
 	for a in glob(os.path.join(flickrfsHome, '.*')):
 		os.remove(os.path.join(flickrfsHome, a))
 
+# Set up logging
+log = logging.getLogger('flickrfs')
 loghdlr = logging.handlers.RotatingFileHandler(os.path.join(flickrfsHome,'log'), "a", 5242880, 3)
-#loghdlr = logging.handlers.RotatingFileHandler("/var/log/flickrfs", "a", 5242880, 3)
-	
 logfmt = logging.Formatter("%(asctime)s %(levelname)-10s %(message)s", "%x %X")
 loghdlr.setFormatter(logfmt)
 log.addHandler(loghdlr)
 log.setLevel(logging.DEBUG)
-
-#Import flickr python api
-from flickrapi import FlickrAPI
-
-# flickr auth information
-flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
-flickrSecret = "3fbf7144be7eca28"                  # shared "secret"
-browserName = "/usr/bin/firefox"                   # for out-of-band auth inside a web browser
 
 
 #Utility functions.
@@ -82,7 +76,8 @@ def kwdict(**kw): return kw
 
 
 
-class TransFlickr:  #Transactions with flickr
+#Transactions with flickr, wraps FlickrAPI calls in Flickfs-specialized functions.
+class TransFlickr: 
 
 	extras = "original_format,date_upload,last_update"
 
