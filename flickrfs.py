@@ -17,6 +17,7 @@ import os, sys
 from errno import *
 from stat import *
 from traceback import format_exc
+from glob import glob
 
 import thread, array, string, urllib2, traceback, ConfigParser, mimetypes, codecs
 
@@ -31,15 +32,10 @@ homedir = os.getenv('HOME')
 flickrfsHome = os.path.join(homedir, '.flickrfs')
 if not os.path.exists(flickrfsHome):
 	os.mkdir(os.path.join(flickrfsHome))
-
-# Remove previous metadata files from ~/.flickrfs
-import glob
-files = glob.glob1(flickrfsHome, '.*')
-for a in files:
-	try:
+else:
+	# Remove previous metadata files from ~/.flickrfs
+	for a in glob(os.path.join(flickrfsHome, '.*')):
 		os.remove(os.path.join(flickrfsHome, a))
-	except:
-		pass
 
 loghdlr = logging.handlers.RotatingFileHandler(os.path.join(flickrfsHome,'log'), "a", 5242880, 3)
 #loghdlr = logging.handlers.RotatingFileHandler("/var/log/flickrfs", "a", 5242880, 3)
