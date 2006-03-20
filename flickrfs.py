@@ -130,7 +130,7 @@ class TransFlickr:
 	
 	def createSet(self, path, photo_id):
 		log.info("Creating set:%s:with primary photo:%s:"%(path,photo_id))
-                path, title = os.path.split(path)
+		path, title = os.path.split(path)
 		rsp = self.fapi.photosets_create(title=title, primary_photo_id=photo_id)
 		if rsp:
 			log.info("Created set:%s:"%(title))
@@ -272,9 +272,9 @@ class TransFlickr:
 
 	def getUserId(self):
 		rsp = self.fapi.auth_checkToken()
-                if not rsp:
-                    log.error("Unable to get userid:" + rsp.errormsg)
-                    return None
+		if not rsp:
+			log.error("Unable to get userid:" + rsp.errormsg)
+			return None
 		usr = rsp.auth[0].user[0]
 		log.info("Got NSID:"+ usr['nsid'] + ":")
 		return usr['nsid']
