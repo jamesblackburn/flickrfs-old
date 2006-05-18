@@ -1,0 +1,3 @@
+#Placed as $HOMEDIR/.flickrfs/config.txt
+[configuration]
+image.size:1024x760

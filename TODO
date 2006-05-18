@@ -1,7 +1,7 @@
 1. Automatically resizing the photos to 800x600, 1024x728 etc. while
 uploading. The user will specify which resolution the photos shd be
-converted to through a 'settings.properties' file located in flickrfs Home
-directory.
+converted to through a 'config.txt' file located in flickrfs Home
+directory. -DONE
 
 2. Meta data - I have tested the editing of metadata files through sed, vim,
 and gedit. But more tests need to be done on other editors, for e.g. nano,
