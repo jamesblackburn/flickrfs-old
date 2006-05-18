@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #===============================================================================
 #	flickrfs - Virtual Filesystem for Flickr
-#    Copyright (c) 2005 Manish Rai Jain  <manishrjain@gmail.com>
+#	Copyright (c) 2005 Manish Rai Jain  <manishrjain@gmail.com>
 #
-#    This program can be distributed under the terms of the GNU GPL version 2, or 
-#    its later versions. 
+#	This program can be distributed under the terms of the GNU GPL version 2, or 
+#	its later versions. 
 #
 # DISCLAIMER: The API Key and Shared Secret are provided by the author in 
 # the hope that it will prevent unnecessary trouble to the end-user. The 
@@ -20,14 +20,14 @@ from stat import *
 from traceback import format_exc
 from fuse import Fuse
 from flickrapi import FlickrAPI
-
+import random
 
 #Some global definitions and functions
 DEFAULTBLOCKSIZE = 4*1024  #4KB
 # flickr auth information
 flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
-flickrSecret = "3fbf7144be7eca28"                  # shared "secret"
-browserName = "/usr/bin/firefox"                   # for out-of-band auth inside a web browser
+flickrSecret = "3fbf7144be7eca28"				  # shared "secret"
+browserName = "/usr/bin/firefox"				   # for out-of-band auth inside a web browser
 
 #Set up the .flickfs directory.
 homedir = os.getenv('HOME')
@@ -47,30 +47,33 @@ loghdlr.setFormatter(logfmt)
 log.addHandler(loghdlr)
 log.setLevel(logging.DEBUG)
 
+cp = ConfigParser.ConfigParser()
+cp.read(flickrfsHome + '/config.txt')
+iSizestr = cp.get('configuration', 'image.size')
 
 #Utility functions.
 def _log_exception_wrapper(func, *args, **kw):
-        """Call 'func' with args and kws and log any exception it throws.
-        """
-        try: func(*args, **kw)
-        except:
-            log.error("Exception in function %s" % func)
-            log.error(format_exc())
+		"""Call 'func' with args and kws and log any exception it throws.
+		"""
+		try: func(*args, **kw)
+		except:
+			log.error("Exception in function %s" % func)
+			log.error(format_exc())
 
 def background(func, *args, **kw):
-        """Run 'func' as a thread, logging any exceptions it throws.
+		"""Run 'func' as a thread, logging any exceptions it throws.
 
-        To run
+		To run
 
-            somefunc(arg1, arg2='value')
+			somefunc(arg1, arg2='value')
 
-        as a thread, do:
+		as a thread, do:
 
-            background(somefunc, arg1, arg2='value')
+			background(somefunc, arg1, arg2='value')
 
-        Any exceptions thrown are logged as errors, and the traceback is logged.
-        """
-        thread.start_new_thread(_log_exception_wrapper, (func,)+args, kw)
+		Any exceptions thrown are logged as errors, and the traceback is logged.
+		"""
+		thread.start_new_thread(_log_exception_wrapper, (func,)+args, kw)
 
 def kwdict(**kw): return kw
 
@@ -83,11 +86,13 @@ class TransFlickr:
 
 	def __init__(self):
 		self.fapi = FlickrAPI(flickrAPIKey, flickrSecret)
+		self.user_id = ""
 		# proceed with auth
 		# TODO use auth.checkToken function if available, and wait after opening browser
-	    	log.info("Authorizing with flickr...")
+		log.info("Authorizing with flickr...")
 		try:
 			self.authtoken = self.fapi.getToken(browser=browserName)
+			print 'Got token from flickrapi.py'
 		except:
 			print ("Can't retrieve token from browser:%s:"%(browserName,))
 			log.error(format_exc())
@@ -96,21 +101,51 @@ class TransFlickr:
 		if self.authtoken == None:
 			log.error('Not able to authorize. Exiting...')
 			sys.exit(-1)
-	    		#Add some authorization checks here(?)
+				#Add some authorization checks here(?)
 		log.info('Authorization complete')
 
+	def imageResize(self, bufData):
+		im = '/tmp/flickrfs-' + str(int(random.random()*1000000000))
+		print im
+		f = open(im, 'w')
+		f.write(bufData)
+		f.close()
+		cmd = 'convert %s -resize %s %s-conv'%(im, iSizestr, im)
+		#try:
+		ret = os.system(cmd)
+		print 'return code: ', ret
+		if ret!=0:
+			print "convert Command not found. Install Imagemagick"
+			log.error("convert Command not found. Install Imagemagick")	
+			return bufData
+		else:
+		#except: 
+		#	log.error("Command not found. Install Imagemagick")
+		#	return bufData
+			f = open(im + '-conv')
+			return f.read()
+		
 	def uploadfile(self, filepath, taglist, bufData, mode):
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
+			#E.g. 745 - 4:No f&f, but 5:public
+			#E.g. 754 - 5:friends, but not public
+			#E.g. 774 - 7:f&f, but not public
+		if iSizestr is not "":
+			log.info("Resizing image to %s:%s"%(iSizestr,filepath))
+			bufData = self.imageResize(bufData)
+		else:
+			log.info("Uploading original size of image: " + filepath)
+
 		log.info("Uploading file: " + filepath + ":with data of len:" + str(len(bufData)))
 		log.info("Permissions:Family:%s Friends:%s Public:%s"%(family,friends,public))
 		rsp = self.fapi.upload(filename=filepath, jpegData=bufData,
-        	        title=os.path.splitext(os.path.basename(filepath))[0],
-                	tags=taglist,
-                	is_public=public and "1" or "0",
-                	is_friend=friends and "1" or "0",
-                	is_family=family and "1" or "0")
+					title=os.path.splitext(os.path.basename(filepath))[0],
+					tags=taglist,
+					is_public=public and "1" or "0",
+					is_friend=friends and "1" or "0",
+					is_family=family and "1" or "0")
 		if rsp==None:
 			log.error("Can't write file: " + filepath)
 		elif rsp:
@@ -122,7 +157,7 @@ class TransFlickr:
 
 	def put2Set(self, set_id, photo_id):
 		log.info("Uploading photo:"+photo_id+":to set_id:"+set_id)
-		rsp = self.fapi.photosets_addPhoto(photoset_id=set_id, photo_id=photo_id)
+		rsp = self.fapi.photosets_addPhoto(auth_token=self.authtoken, photoset_id=set_id, photo_id=photo_id)
 		if rsp:
 			log.info("Uploaded photo to set")
 		else:
@@ -131,7 +166,7 @@ class TransFlickr:
 	def createSet(self, path, photo_id):
 		log.info("Creating set:%s:with primary photo:%s:"%(path,photo_id))
 		path, title = os.path.split(path)
-		rsp = self.fapi.photosets_create(title=title, primary_photo_id=photo_id)
+		rsp = self.fapi.photosets_create(auth_token=self.authtoken, title=title, primary_photo_id=photo_id)
 		if rsp:
 			log.info("Created set:%s:"%(title))
 			return rsp.photoset[0]['id']
@@ -143,14 +178,14 @@ class TransFlickr:
 		if str(set_id)=="0":
 			log.info("The set is non-existant online.")
 			return
-		rsp = self.fapi.photosets_delete(photoset_id=set_id)
+		rsp = self.fapi.photosets_delete(auth_token=self.authtoken, photoset_id=set_id)
 		if rsp:
 			log.info("Deleted set")
 		else:
 			log.error(rsp.errormsg)
 	
 	def getPhotoInfo(self, photoId):
-		rsp = self.fapi.photos_getInfo(photo_id=photoId)
+		rsp = self.fapi.photos_getInfo(auth_token=self.authtoken, photo_id=photoId)
 		if not rsp:
 			log.error("Can't retrieve information about photo: " + rsp.errormsg)
 			log.error("retinfo:%s"%(rsp.errormsg,))
@@ -181,24 +216,28 @@ class TransFlickr:
 		else:
 			taglist = []
 		license = rsp.photo[0]['license']
-		return (format, mode, commMeta, desc, title, taglist, license)
+		owner = rsp.photo[0].owner[0]['username']
+		ownerNSID = rsp.photo[0].owner[0]['nsid']
+		url = rsp.photo[0].urls[0].url[0].elementText
+		return (format, mode, commMeta, desc, title, taglist, license, owner, ownerNSID, url)
 
 	def setPerm(self, photoId, mode, comm_meta):
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
-		rsp = self.fapi.photos_setPerms(is_public=str(public),
+		rsp = self.fapi.photos_setPerms(auth_token=self.authtoken, is_public=str(public),
 			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],
 			perm_addmeta=comm_meta[1], photo_id=photoId)
 		if not rsp:
 			log.error("Couldn't set permission:%s:%s"%(photoId,rsp.errormsg))
 			return False
+		log.info("Set permission:" + photoId)
 		return True
 
 	def setTags(self, photoId, tags):
 		templist = [ '"%s"'%(a,) for a in string.split(tags, ',')] + ['flickrfs']
 		tagstring = ' '.join(templist)
-		rsp = self.fapi.photos_setTags(photo_id=photoId, tags=tagstring)
+		rsp = self.fapi.photos_setTags(auth_token=self.authtoken, photo_id=photoId, tags=tagstring)
 		if not rsp:
 			log.error("Couldn't set tags:%s:"%(photoId,))
 			log.error("setTags: retinfo:%s"%(rsp.errormsg,))
@@ -206,7 +245,7 @@ class TransFlickr:
 		return True
 	
 	def setMeta(self, photoId, title, desc):
-		rsp = self.fapi.photos_setMeta(photo_id=photoId, title=title, description=desc)
+		rsp = self.fapi.photos_setMeta(auth_token=self.authtoken, photo_id=photoId, title=title, description=desc)
 		if not rsp:
 			log.error("Couldn't set meta info:%s:"%(photoId,))
 			log.error("retinfo:%s"%(rsp.errormsg,))
@@ -224,7 +263,7 @@ class TransFlickr:
 		return licenseDict
 		
 	def setLicense(self, photoId, license):
-		rsp = self.fapi.photos_licenses_setLicense(photo_id=photoId, license_id=license)
+		rsp = self.fapi.photos_licenses_setLicense(auth_token=self.authtoken, photo_id=photoId, license_id=license)
 		if not rsp:
 			log.error("Couldn't set license info:%s:"%(photoId,))
 			log.error("retinfo:%s"%(rsp.errormsg,))
@@ -232,7 +271,7 @@ class TransFlickr:
 		return True
 
 	def getPhoto(self, photoId):
-		rsp = self.fapi.photos_getSizes(photo_id=photoId)
+		rsp = self.fapi.photos_getSizes(auth_token=self.authtoken, photo_id=photoId)
 		if not rsp:
 			log.error("Error while trying to retrieve size information:%s:"%(photoId,))
 			return None
@@ -252,7 +291,7 @@ class TransFlickr:
 		return buf
 
 	def removePhotofromSet(self, photoId, photosetId):
-		rsp = self.fapi.photosets_removePhoto(photo_id=photoId, photoset_id=photosetId)
+		rsp = self.fapi.photosets_removePhoto(auth_token=self.authtoken, photo_id=photoId, photoset_id=photosetId)
 		if rsp:
 			log.info("Photo %s removed from set %s" % (photoId, photosetId))
 		else:
@@ -261,7 +300,7 @@ class TransFlickr:
 		
 	def getBandwidthInfo(self):
 		log.debug("Retrieving bandwidth information")
-		rsp = self.fapi.people_getUploadStatus()
+		rsp = self.fapi.people_getUploadStatus(auth_token=self.authtoken)
 		if not rsp:
 			log.error("Can't retrieve bandwidth information: %s" % rsp.errormsg)
 			return (None,None)
@@ -271,16 +310,20 @@ class TransFlickr:
 		return (bw['max'], bw['used'])
 
 	def getUserId(self):
-		rsp = self.fapi.auth_checkToken()
+		rsp = self.fapi.auth_checkToken(api_key=flickrAPIKey, auth_token=self.authtoken)
 		if not rsp:
 			log.error("Unable to get userid:" + rsp.errormsg)
 			return None
 		usr = rsp.auth[0].user[0]
 		log.info("Got NSID:"+ usr['nsid'] + ":")
+		#Set self.user_id to this value
+		self.user_id = usr['nsid']
 		return usr['nsid']
 
 	def getPhotosetList(self):
-		rsp = self.fapi.photosets_getList()
+		if self.user_id is "":
+			self.getUserId() #This will set the value of self.user_id
+		rsp = self.fapi.photosets_getList(auth_token=self.authtoken, user_id=self.user_id)
 		if not rsp:
 			log.error("Error getting photoset list: %s" % (rsp.errormsg))
 			return []
@@ -289,14 +332,14 @@ class TransFlickr:
 		return rsp.photosets[0].photoset
 
 	def getPhotosFromPhotoset(self, photoset_id):
-		rsp = self.fapi.photosets_getPhotos(photoset_id=photoset_id, extras=self.extras)
+		rsp = self.fapi.photosets_getPhotos(auth_token=self.authtoken, photoset_id=photoset_id, extras=self.extras)
 		if not rsp:
 			log.error("Error getting photos from photoset %s: %s" % (photoset_id, rsp.errormsg))
 			return []
 		return rsp.photoset[0].photo
-                        
+						
 	def getPhotoStream(self, user_id):
-		rsp = self.fapi.photos_search(user_id=user_id, per_page="500", extras=self.extras)
+		rsp = self.fapi.photos_search(auth_token=self.authtoken, user_id=user_id, per_page="500", extras=self.extras)
 		if not rsp:
 			log.error("Can't retrive photos from your stream:" + rsp.errormsg)
 			return []
@@ -305,7 +348,7 @@ class TransFlickr:
 		return rsp.photos[0].photo
  
 	def getTaggedPhotos(self, tags, user_id=None):
-		kw = kwdict(tags=tags, tag_mode="all", extras=self.extras, per_page="500")
+		kw = kwdict(auth_token=self.authtoken, tags=tags, tag_mode="all", extras=self.extras, per_page="500")
 		if user_id is not None: kw = kwdict(user_id=user_id, **kw)
 		rsp = self.fapi.photos_search(**kw)
 		log.debug("Search for photos with tags:" + tags + ":done")
@@ -315,7 +358,7 @@ class TransFlickr:
 		if not hasattr(rsp.photos[0], 'photo'):
 			return []
 		return rsp.photos[0].photo
-                
+				
 
 
 class Inode(object):
@@ -348,7 +391,7 @@ class DirInode(Inode):
 		self.mode = S_IFDIR | self.mode
 		self.nlink += 1
 		self.dirfile = ""
-                self.setId = self.id
+		self.setId = self.id
 
 
 class FileInode(Inode):
@@ -361,16 +404,15 @@ class FileInode(Inode):
 		self.photoId = self.id
 		self.comm_meta = comm_meta
 
-		
 
 class Flickrfs(Fuse):
 
-    	def __init__(self, *args, **kw):
-    
-        	Fuse.__init__(self, *args, **kw)
-            	log.info("flickrfs.py:Flickrfs:mountpoint: %s" % repr(self.mountpoint))
-            	log.info("flickrfs.py:Flickrfs:unnamed mount options: %s" % self.optlist)
-	       	log.info("flickrfs.py:Flickrfs:named mount options: %s" % self.optdict)
+	def __init__(self, *args, **kw):
+	
+		Fuse.__init__(self, *args, **kw)
+		log.info("flickrfs.py:Flickrfs:mountpoint: %s" % repr(self.mountpoint))
+		log.info("flickrfs.py:Flickrfs:unnamed mount options: %s" % self.optlist)
+		log.info("flickrfs.py:Flickrfs:named mount options: %s" % self.optdict)
 		
 		self.inodeCache = {}  #Cached inodes for faster access
 		self.NSID = ""
@@ -394,12 +436,14 @@ class Flickrfs(Fuse):
 		self._mkdir("/tags")
 		self._mkdir("/tags/personal")
 		self._mkdir("/tags/public")
-        	background(self.sets_thread)
+		background(self.sets_thread)
 
 	def writeMetaInfo(self, id, INFO):
 		#The metadata may be unicode strings, so we need to encode them on write
 		f = codecs.open(os.path.join(flickrfsHome, '.'+id), 'w', 'utf8')
 		f.write('#Metadata file : flickrfs - Virtual filesystem for flickr\n')
+		f.write('#Photo owner: %s  NSID: %s\n'%(INFO[7], INFO[8]))
+		f.write('#Handy link to photo: %s\n'%(INFO[9]))
 		f.write('#Licences available: \n')
 		iter = self.licenseDict.iterkeys()
 		while True:
@@ -420,9 +464,9 @@ class Flickrfs(Fuse):
 
 	def sets_thread(self):
 		"""
-        	The beauty of the FUSE python implementation is that with the python interp
-        	running in foreground, you can have threads
-        	"""    
+			The beauty of the FUSE python implementation is that with the python interp
+			running in foreground, you can have threads
+			"""	
 		log.info("sets_thread: started")
 		self._mkdir("/sets")
 		for a in self.transfl.getPhotosetList():
@@ -450,7 +494,7 @@ class Flickrfs(Fuse):
 		sendtagList = ','.join(tagName.split(':'))
 		if(path.startswith('/tags/personal')):
 			user_id = self.NSID
-                else:
+		else:
 			user_id = None
 		for b in self.transfl.getTaggedPhotos(sendtagList, user_id):
 			self._mkfileWithMeta(path, b)
@@ -460,10 +504,10 @@ class Flickrfs(Fuse):
 		if INFO==None:
 			log.error("Can't retrieve info:%s:"%(b['id'],))
 			return
-		title = b['title'].replace('/', ' ')
-		if title.strip()=='':
-			title = str(b['id'])
+		title = b['title'].replace('/', '_')
+		#if title.strip()=='':
 		title = title[:32]   #Only allow 32 characters
+		title += '_' + str(b['id'])
 		ext = '.' + INFO[0]
 		if os.path.splitext(title)[1]!=ext:
 			title = title + ext
@@ -477,7 +521,7 @@ class Flickrfs(Fuse):
 		#with regular strings.
 		path = path.encode('utf8')
 		if id!=0: id = id.encode('utf8')
-	        parentDir, name = os.path.split(path)
+		parentDir, name = os.path.split(path)
 		if parentDir=='':
 			parentDir = '/'
 		log.debug("parentDir:" + parentDir + ":")
@@ -507,8 +551,8 @@ class Flickrfs(Fuse):
 			size = os.path.getsize(datapath)
 			self.inodeCache[path] = FileInode(path, id, size=size)
 
-    	def getattr(self, path):
-    		log.debug("getattr:" + path + ":")
+	def getattr(self, path):
+		log.debug("getattr:" + path + ":")
 		if path.startswith('/sets/'):
 			templist = path.split('/')
 			ind = templist.index('sets')
@@ -518,23 +562,23 @@ class Flickrfs(Fuse):
 			log.debug("getattr:After modifying:%s:" % (path))
 
 		inode=self.getInode(path)
-        	if inode:
-			log.debug("inode "+str(inode))
-            		statTuple = (inode.mode,inode.ino,inode.dev,inode.nlink,
+		if inode:
+			#log.debug("inode "+str(inode))
+			statTuple = (inode.mode,inode.ino,inode.dev,inode.nlink,
 				inode.uid,inode.gid,inode.size,inode.atime,inode.mtime,inode.ctime)
-                	log.debug("statsTuple "+str(statTuple))
-            		return statTuple
-        	else:
+			#log.debug("statsTuple "+str(statTuple))
+			return statTuple
+		else:
 			e = OSError("No such file"+path)
-            		e.errno = ENOENT
-           		raise e
+			e.errno = ENOENT
+			raise e
 
-    	def readlink(self, path):
-    		log.debug("readlink")
-    		return os.readlink(path)
+	def readlink(self, path):
+		log.debug("readlink")
+		return os.readlink(path)
 	
-    	def getdir(self, path):
-    		log.debug("getdir:" + path)
+	def getdir(self, path):
+		log.debug("getdir:" + path)
 		templist = ['.', '..']
 		for a in self.inodeCache.keys():
 			ind = a.rindex('/')
@@ -546,8 +590,8 @@ class Flickrfs(Fuse):
 					templist.append(name)
 		return map(lambda x: (x,0), templist)
 
-    	def unlink(self, path):
-    		log.debug("unlink:%s:" % (path))
+	def unlink(self, path):
+		log.debug("unlink:%s:" % (path))
 		if self.inodeCache.has_key(path):
 			inode = self.inodeCache.pop(path)
 			
@@ -569,7 +613,7 @@ class Flickrfs(Fuse):
 			#using editors like Vim. They make loads of 
 			#crap buffer files
 	
-    	def rmdir(self, path):
+	def rmdir(self, path):
 		log.debug("rmdir:%s:"%(path))
 		if self.inodeCache.has_key(path):
 			for a in self.inodeCache.keys():
@@ -580,8 +624,8 @@ class Flickrfs(Fuse):
 		else:
 			log.error("Can't find the directory you want to remove")
 			e = OSError("No such folder"+path)
-            		e.errno = ENOENT
-           		raise e
+			e.errno = ENOENT
+			raise e
 			
 		ind = path.rindex('/')
 		pPath = path[:ind]
@@ -602,15 +646,15 @@ class Flickrfs(Fuse):
 			pInode = self.getInode(pPath)
 			pInode.nlink -= 1
 		else:
-    			log.debug("rmdir!! I refuse to do anything! <Stubborn>")
+			log.debug("rmdir!! I refuse to do anything! <Stubborn>")
 			e = OSError("Removal of folder %s not allowed" % (path))
 			e.errno = EPERM
 			raise e
 	
-    	def symlink(self, path, path1):
-    		log.debug("symlink")
-    		return os.symlink(path, path1)	
-    
+	def symlink(self, path, path1):
+		log.debug("symlink")
+		return os.symlink(path, path1)	
+	
    	def rename(self, path, path1):
 		log.debug("rename:path:%s:to path1:%s:"%(path,path1))
 		#Donot allow Vim to create a file~
@@ -642,10 +686,10 @@ class Flickrfs(Fuse):
 		retinfo = self.parse(fname, inode.photoId)
 		if retinfo.count('Error')>0:
 			log.error(retinfo)
-	    
+		
 	def link(self, path, path1):
 		log.debug("link")
-	    
+		
 	def chmod(self, path, mode):
 		log.debug("chmod. Oh! So, you found use as well!")
 		inode = self.getInode(path)
@@ -656,16 +700,16 @@ class Flickrfs(Fuse):
 			return
 				
 #		elif typesinfo[0]==None or typesinfo[0].count('image')<=0:
-		else:
-			inode.mode = mode
-			return
+#		else:
+#			inode.mode = mode
+#			return
 
 		if self.transfl.setPerm(inode.photoId, mode, inode.comm_meta)==True:
 			inode.mode = mode
-	    
+		
 	def chown(self, path, user, group):
 		log.debug("chown. Are you of any use in flickrfs?")
-	    
+		
 	def truncate(self, path, size):
 		log.debug("truncate?? Okay okay! I accept your usage:%s:%s"%(path,size))
 		ind = path.rindex('/')
@@ -677,7 +721,7 @@ class Flickrfs(Fuse):
 			filePath = os.path.join(flickrfsHome, '.'+inode.photoId)
 			f = open(filePath, 'w+')
 			return f.truncate(size)
-	    
+		
 	def mknod(self, path, mode, dev):
 		""" Python has no os.mknod, so we can only do some things """
 		log.debug("mknod? OK! Had a close encounter!!:%s:"%(path,))
@@ -709,7 +753,7 @@ class Flickrfs(Fuse):
 		else:
 			self._mkfile(path, id="NEW", mode=mode)
 
-    	def mkdir(self, path, mode):
+	def mkdir(self, path, mode):
 		log.debug("mkdir:" + path + ":")
 		if path.startswith("/tags"):
 			if path.count('/')==3:   #/tags/personal (or private)/dirname ONLY
@@ -736,13 +780,13 @@ class Flickrfs(Fuse):
 			e.errno = EACCES
 			raise e
 			
-    	def utime(self, path, times):
+	def utime(self, path, times):
 		inode = self.getInode(path)
 		inode.atime = times[0]
 		inode.mtime = times[1]
 		return 0
 
-    	def open(self, path, flags):
+	def open(self, path, flags):
 		log.info("open: " + path)
 		ind = path.rindex('/')
 		name_file = path[ind+1:]
@@ -772,7 +816,7 @@ class Flickrfs(Fuse):
 			inode.size = long(inode.buf.__len__())
 			log.debug("Size of image: " + str(inode.size))
 		return 0
-	    
+		
 	def read(self, path, len, offset):
 		log.debug("read:%s:offset:%s:len:%s:"%(path,offset,len))
 		inode = self.getInode(path)
@@ -798,7 +842,7 @@ class Flickrfs(Fuse):
 			inode.size = long(inode.buf.__len__())
 		sIndex = int(offset)
 		ilen = int(len)
-    		temp = inode.buf[sIndex:sIndex+ilen]
+		temp = inode.buf[sIndex:sIndex+ilen]
 		if temp.__len__() < len:
 			del inode.buf
 			inode.buf=""
@@ -840,8 +884,8 @@ class Flickrfs(Fuse):
 			return "Error:Can't parse"
 		return 'Success:Updated photo:%s:%s:'%(fname,photoId)
 
-    	def write(self, path, buf, off):
-		log.debug("write:" + path)
+	def write(self, path, buf, off):
+		log.debug("write:%s:%s"%(path, off))
 		
 		# I think its better that you wait when you upload photos. 
 		# So, dun start a thread. Do it inline!
@@ -934,11 +978,11 @@ class Flickrfs(Fuse):
 				else:
 					self.transfl.put2Set(pinode.setId, id)
 				
-    		return len(buf)
+		return len(buf)
 
 	def getInode(self, path):
 		if self.inodeCache.has_key(path):
-			log.debug("Got cached inode: " + path)
+			#log.debug("Got cached inode: " + path)
 			return self.inodeCache[path]
 		else:
 			log.debug("No inode??? I DIE!!!")
@@ -946,14 +990,14 @@ class Flickrfs(Fuse):
 
 
 	def release(self, path, flags):
-	        log.debug("flickrfs.py:Flickrfs:release: %s %s" % (path,flags))
-	        return 0
+		log.debug("flickrfs.py:Flickrfs:release: %s %s" % (path,flags))
+		return 0
 	
-    	def statfs(self):
-        	"""
-        Should return a tuple with the following elements in respective order:
+	def statfs(self):
+		"""
+	Should return a tuple with the following elements in respective order:
 	
-    	F_BSIZE - Preferred file system block size. (int)
+	F_BSIZE - Preferred file system block size. (int)
 	F_FRSIZE - Fundamental file system block size. (int)
 	F_BLOCKS - Total number of blocks in the filesystem. (long)
 	F_BFREE - Total number of free blocks. (long)
@@ -963,34 +1007,39 @@ class Flickrfs(Fuse):
 	F_FAVAIL - Free nodes available to non-super user. (long)
 	F_FLAG - Flags. System dependent: see statvfs() man page. (int)
 	F_NAMEMAX - Maximum file name length. (int)
-        Feel free to set any of the above values to 0, which tells
-        the kernel that the info is not available.
-        """
+	Feel free to set any of the above values to 0, which tells
+	the kernel that the info is not available.
+		"""
+		#Not working properly. Block for time being
+		return
 		log.debug("statfs called")
-        	block_size = 1024
+		block_size = 1024
 		fun_block_size = 1024
-        	total_blocks = 0L
-        	blocks_free = 0L
+		total_blocks = 0L
+		blocks_free = 0L
 		blocks_free_user = 0L
-        	files = 0L
-        	files_free = 0L
+		files = 0L
+		files_free = 0L
 		files_free_user = 0L
 		flag = 0
-        	namelen = 255
+		namelen = 255
 		(max, used) = self.transfl.getBandwidthInfo()
 		if max!=None:
 			total_blocks = long(int(max)/block_size)
 			blocks_free = long( ( int(max)-int(used) )/block_size)
 			blocks_free_user = blocks_free
+
+			#files = total_blocks
+			#files_free = blocks_free
+			#files_free_user = blocks_free_user
 			log.debug('total blocks:%s'%(total_blocks))
 			log.debug('blocks_free:%s'%(blocks_free))
-        	return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user,
-			files, files_free, files_free_user, namelen)
+		return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user, files, files_free, files_free_user, namelen)
 
 	def fsync(self, path, isfsyncfile):
-	        log.debug("flickrfs.py:Flickrfs:fsync: path=%s, isfsyncfile=%s"%(path,isfsyncfile))
-	        return 0
-    
+		log.debug("flickrfs.py:Flickrfs:fsync: path=%s, isfsyncfile=%s"%(path,isfsyncfile))
+		return 0
+
 
 
 if __name__ == '__main__':

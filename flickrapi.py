@@ -188,13 +188,12 @@ class FlickrAPI:
 
 		"""
 		dataName = self.secret
+		#print data
 		keys = data.keys()
 		keys.sort()
 
-		#Modified by Manish <manishrjain@gmail.com>
-		for a in keys: 
-			dataName += (a + data[a])
-		#print dataName
+		for a in keys: dataName += (a + data[a])
+		#print 'dataName:', dataName
 		hash = md5.new()
 		hash.update(dataName)
 		return hash.hexdigest()
@@ -229,18 +228,28 @@ class FlickrAPI:
 				arg["method"] = _method
 				# Modified here: use default api_key and auth_token if not supplied
 				# Mod by: R. David Murray <rdmurray@bitdance.com>
+	
+				#API Key is used in all the methods. So, instead of specifying it as 
+				#parameter in calling function, we can append it over here by default.
+				#Token eq. to Authentication is not required for all methods. So, 
+				#better specify when needed. -Manish
+
 				if not 'api_key' in arg: arg["api_key"] = _self.apiKey
-				if not 'auth_token' in arg and hasattr(_self, 'token'): arg['auth_token'] = _self.token
+#				if not 'auth_token' in arg and hasattr(_self, 'token'): arg['auth_token'] = _self.token
 				postData = urllib.urlencode(arg) + "&api_sig=" + \
 					_self.__sign(arg)
-				#print "--url---------------------------------------------"
-				#print url
-				#print "--postData----------------------------------------"
-				#print postData
-				f = urllib.urlopen(url, postData)
-				data = f.read()
-				#print "--response----------------------------------------"
-				#print data
+				print "--url---------------------------------------------"
+				print url
+				print "--postData----------------------------------------"
+				print postData
+				data = ""
+				try:
+					f = urllib.urlopen(url, postData)
+					data = f.read()
+				except KeyError:
+					print 'Ctrl+C. Terminated by User'
+				print "--response----------------------------------------"
+				print data
 				f.close()
 				tempNode = XMLNode()
 				# Modified here: added XMLNode() as the 1st argument
@@ -459,18 +468,15 @@ class FlickrAPI:
 			# get the frob
 			rsp = self.auth_getFrob(api_key=self.apiKey)
 			self.testFailure(rsp)
-
 			frob = rsp.frob[0].elementText
 
 			# validate online
 			os.system("%s '%s'" % (browser, self.__getAuthURL(perms, frob)))
-
 			# get a token
 			rsp = self.auth_getToken(api_key=self.apiKey, frob=frob)
 			self.testFailure(rsp)
-
 			token = rsp.auth[0].token[0].elementText
-
+			
 			# store the auth info for next time
 			self.__setCachedToken(rsp.xml)
 
