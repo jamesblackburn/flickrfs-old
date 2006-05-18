@@ -92,7 +92,6 @@ class TransFlickr:
 		log.info("Authorizing with flickr...")
 		try:
 			self.authtoken = self.fapi.getToken(browser=browserName)
-			print 'Got token from flickrapi.py'
 		except:
 			print ("Can't retrieve token from browser:%s:"%(browserName,))
 			log.error(format_exc())
@@ -106,14 +105,12 @@ class TransFlickr:
 
 	def imageResize(self, bufData):
 		im = '/tmp/flickrfs-' + str(int(random.random()*1000000000))
-		print im
 		f = open(im, 'w')
 		f.write(bufData)
 		f.close()
 		cmd = 'convert %s -resize %s %s-conv'%(im, iSizestr, im)
 		#try:
 		ret = os.system(cmd)
-		print 'return code: ', ret
 		if ret!=0:
 			print "convert Command not found. Install Imagemagick"
 			log.error("convert Command not found. Install Imagemagick")	

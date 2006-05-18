@@ -50,6 +50,7 @@ import os.path
 import xml.dom.minidom
 import urllib2
 
+DEBUG = 0
 ########################################################################
 # XML functionality
 ########################################################################
@@ -238,18 +239,20 @@ class FlickrAPI:
 #				if not 'auth_token' in arg and hasattr(_self, 'token'): arg['auth_token'] = _self.token
 				postData = urllib.urlencode(arg) + "&api_sig=" + \
 					_self.__sign(arg)
-				print "--url---------------------------------------------"
-				print url
-				print "--postData----------------------------------------"
-				print postData
+				if DEBUG:
+					print "--url---------------------------------------------"
+					print url
+					print "--postData----------------------------------------"
+					print postData
 				data = ""
 				try:
 					f = urllib.urlopen(url, postData)
 					data = f.read()
 				except KeyError:
 					print 'Ctrl+C. Terminated by User'
-				print "--response----------------------------------------"
-				print data
+				if DEBUG:
+					print "--response----------------------------------------"
+					print data
 				f.close()
 				tempNode = XMLNode()
 				# Modified here: added XMLNode() as the 1st argument
