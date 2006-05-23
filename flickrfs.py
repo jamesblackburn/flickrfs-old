@@ -118,8 +118,8 @@ class TransFlickr:
 			self.authtoken = self.fapi.getToken(browser=browserName)
 		except:
 			print ("Can't retrieve token from browser:%s:"%(browserName,))
-			print "If you're behind a proxy server, first set http_proxy environment variable."
-			print "Please close all your browser windows, and try again"
+			print "\tIf you're behind a proxy server, first set http_proxy environment variable."
+			print "\tPlease close all your browser windows, and try again"
 			log.error(format_exc())
 			log.error("Can't retrieve token from browser:%s:"%(browserName,))
 			sys.exit(-1)
@@ -543,11 +543,27 @@ class Flickrfs(Fuse):
 				psetLocal.remove((imageTitle,0))
 			for c in psetLocal:
 				log.info('deleting:%s'%(c[0],))
-				self.unlink(curdir+'/'+c[0])
+				self.unlink(curdir+'/'+c[0], False)
 
 	def sync_sets_thread(self):
 		log.info("sync_sets_thread: started")
-		for a in self.transfl.getPhotosetList():
+		setListOnline = self.transfl.getPhotosetList()
+		setListLocal = self.getdir('/sets', False)
+		
+		for a in setListOnline:
+			title = a.title[0].elementText.replace('/', '_')
+			if title.strip()=="":
+				title = a['id']
+			if (title,0) not in setListLocal: #New set added online
+				log.info("%s set has been added online."%(title,))
+				self._mkdir('/sets/'+title, a['id'])
+			else: #Present Online
+				setListLocal.remove((title,0))
+		for a in setListLocal: #List of sets present locally, but not online
+			log.info('Recursively deleting set %s'%(a,))
+			self.rmdir('/sets/'+a[0], online=False, recr=True)
+				
+		for a in setListOnline:
 			title = a.title[0].elementText.replace('/', '_')
 			curdir = "/sets/" + title
 			if title.strip()=='':
@@ -567,6 +583,7 @@ class Flickrfs(Fuse):
 		log.info("stream_thread started")
 		for b in self.transfl.getPhotoStream(self.NSID):
 			self._mkfileWithMeta('/stream', b['id'])
+		log.info("stream_thread finished")
 			
 	def tags_thread(self, path):
 		ind = string.rindex(path, '/')
@@ -679,7 +696,7 @@ class Flickrfs(Fuse):
 					templist.append(name)
 		return map(lambda x: (x,0), templist)
 
-	def unlink(self, path):
+	def unlink(self, path, online=True):
 		log.debug("unlink:%s:" % (path))
 		if self.inodeCache.has_key(path):
 			inode = self.inodeCache.pop(path)
@@ -693,8 +710,9 @@ class Flickrfs(Fuse):
 				ind = path.rindex('/')
 				pPath = path[:ind]
 				pinode = self.getInode(pPath)
-				self.transfl.removePhotofromSet(photoId=inode.photoId, photosetId=pinode.setId)
-				log.info("Photo %s removed from set"%(path,))
+				if online:
+					self.transfl.removePhotofromSet(photoId=inode.photoId, photosetId=pinode.setId)
+					log.info("Photo %s removed from set"%(path,))
 			del inode
 		else:
 			log.error("Can't find what you want to remove")
@@ -702,43 +720,37 @@ class Flickrfs(Fuse):
 			#using editors like Vim. They make loads of 
 			#crap buffer files
 	
-	def rmdir(self, path):
+	def rmdir(self, path, online=True, recr=False):
 		log.debug("rmdir:%s:"%(path))
 		if self.inodeCache.has_key(path):
 			for a in self.inodeCache.keys():
 				if a.startswith(path+'/'):
-					e = OSError("Directory not empty")
-					e.errno = ENOTEMPTY
-					raise e
+					if recr:
+						self.unlink(a, online)
+					else:
+						e = OSError("Directory not empty")
+						e.errno = ENOTEMPTY
+						raise e
 		else:
 			log.error("Can't find the directory you want to remove")
 			e = OSError("No such folder"+path)
 			e.errno = ENOENT
 			raise e
 			
-		ind = path.rindex('/')
-		pPath = path[:ind]
-		if path.startswith('/tags/personal/'):	
-			inode = self.inodeCache.pop(path)
-			del inode
-			pInode = self.getInode(pPath)
-			pInode.nlink -= 1
-		elif path.startswith('/tags/public/'):
-			inode = self.inodeCache.pop(path)
-			del inode
-			pInode = self.getInode(pPath)
-			pInode.nlink -= 1
-		elif path.startswith('/sets/'):
-			inode = self.inodeCache.pop(path)
-			self.transfl.deleteSet(inode.setId)
-			del inode
-			pInode = self.getInode(pPath)
-			pInode.nlink -= 1
-		else:
-			log.debug("rmdir!! I refuse to do anything! <Stubborn>")
+		if path=='/sets' or path=='/tags' or path=='/tags/personal' or path=='/tags/public' or path=='/stream':
+			log.debug("rmdir on the framework! I refuse to do anything! <Stubborn>")
 			e = OSError("Removal of folder %s not allowed" % (path))
 			e.errno = EPERM
 			raise e
+
+		ind = path.rindex('/')
+		pPath = path[:ind]
+		inode = self.inodeCache.pop(path)
+		if online and path.startswith('/sets/'):
+			self.transfl.deleteSet(inode.setId)
+		del inode
+		pInode = self.getInode(pPath)
+		pInode.nlink -= 1
 	
 	def symlink(self, path, path1):
 		log.debug("symlink")
@@ -1112,7 +1124,7 @@ class Flickrfs(Fuse):
 			#log.debug("Got cached inode: " + path)
 			return self.inodeCache[path]
 		else:
-			log.debug("No inode??? I DIE!!!")
+			#log.debug("No inode??? I DIE!!!")
 			return None
 
 
