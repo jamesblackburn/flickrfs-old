@@ -21,6 +21,8 @@ from traceback import format_exc
 from fuse import Fuse
 from flickrapi import FlickrAPI
 import random
+import commands
+import threading
 
 #Some global definitions and functions
 DEFAULTBLOCKSIZE = 4*1024  #4KB
@@ -49,7 +51,21 @@ log.setLevel(logging.DEBUG)
 
 cp = ConfigParser.ConfigParser()
 cp.read(flickrfsHome + '/config.txt')
-iSizestr = cp.get('configuration', 'image.size')
+iSizestr = ""
+sets_sync_int = 600.0
+stream_sync_int = 600.0
+try:
+	iSizestr = cp.get('configuration', 'image.size')
+except:
+	print 'No default size of image found. Will upload original size of images.'
+try:
+	sets_sync_int = float(cp.get('configuration', 'sets.sync.int'))
+except:
+	pass
+try:
+	stream_sync_int = float(cp.get('configuration', 'stream.sync.int'))
+except:
+	pass
 
 #Utility functions.
 def _log_exception_wrapper(func, *args, **kw):
@@ -77,8 +93,15 @@ def background(func, *args, **kw):
 
 def kwdict(**kw): return kw
 
-
-
+def timerThread(func, func1, interval):
+	'''Execute func now, followed by func1 every interval seconds
+	'''
+	t = threading.Timer(0.0, func)
+	t.run()
+	while(interval):
+		t = threading.Timer(interval, func1)
+		t.run()
+		
 #Transactions with flickr, wraps FlickrAPI calls in Flickfs-specialized functions.
 class TransFlickr: 
 
@@ -89,11 +112,14 @@ class TransFlickr:
 		self.user_id = ""
 		# proceed with auth
 		# TODO use auth.checkToken function if available, and wait after opening browser
+		print "Authorizing with flickr..."
 		log.info("Authorizing with flickr...")
 		try:
 			self.authtoken = self.fapi.getToken(browser=browserName)
 		except:
 			print ("Can't retrieve token from browser:%s:"%(browserName,))
+			print "If you're behind a proxy server, first set http_proxy environment variable."
+			print "Please close all your browser windows, and try again"
 			log.error(format_exc())
 			log.error("Can't retrieve token from browser:%s:"%(browserName,))
 			sys.exit(-1)
@@ -101,6 +127,7 @@ class TransFlickr:
 			log.error('Not able to authorize. Exiting...')
 			sys.exit(-1)
 				#Add some authorization checks here(?)
+		print "Authorization complete. Retrieving photos..."
 		log.info('Authorization complete')
 
 	def imageResize(self, bufData):
@@ -108,6 +135,20 @@ class TransFlickr:
 		f = open(im, 'w')
 		f.write(bufData)
 		f.close()
+		cmd = 'identify -format "%w" %s'%(im,)
+		status,ret = commands.getstatusoutput(cmd)
+		if status!=0:
+			print "identify command not found. Install Imagemagick"
+			log.error("identify command not found. Install Imagemagick")
+			return bufData
+		try:
+			if int(ret)<int(iSizestr.split('x')[0]):
+				log.info('Image size is smaller than specified in config.txt. Taking original size')
+				return bufData
+		except:
+			log.error('Invalid format of image.size in config.txt')
+			return bufData
+	
 		cmd = 'convert %s -resize %s %s-conv'%(im, iSizestr, im)
 		#try:
 		ret = os.system(cmd)
@@ -205,7 +246,7 @@ class TransFlickr:
 			permcomment = rsp.photo[0].permissions[0]['permcomment']
 			permaddmeta = rsp.photo[0].permissions[0]['permaddmeta']
 		else: permcomment = permaddmeta = [None]
-		commMeta = permcomment + permaddmeta #Just add both. Required for chmod
+		commMeta = '%s%s'%(permcomment,permaddmeta) #Just add both. Required for chmod
 		desc = rsp.photo[0].description[0].elementText
 		title = rsp.photo[0].title[0].elementText
 		if hasattr(rsp.photo[0].tags[0], "tag"):
@@ -216,9 +257,11 @@ class TransFlickr:
 		owner = rsp.photo[0].owner[0]['username']
 		ownerNSID = rsp.photo[0].owner[0]['nsid']
 		url = rsp.photo[0].urls[0].url[0].elementText
-		return (format, mode, commMeta, desc, title, taglist, license, owner, ownerNSID, url)
+		posted = rsp.photo[0].dates[0]['posted']
+		lastupdate = rsp.photo[0].dates[0]['lastupdate']
+		return (format, mode, commMeta, desc, title, taglist, license, owner, ownerNSID, url, int(posted), int(lastupdate))
 
-	def setPerm(self, photoId, mode, comm_meta):
+	def setPerm(self, photoId, mode, comm_meta="33"):
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
@@ -374,9 +417,9 @@ class Inode(object):
 		now = int(time.time())
 		self.atime = now
 		if mtime is None: self.mtime = now
-		else: self.mtime = mtime
+		else: self.mtime = int(mtime)
 		if ctime is None: self.ctime = now
-		else: self.ctime = ctime
+		else: self.ctime = int(ctime)
 		self.blocksize = DEFAULTBLOCKSIZE
 
 
@@ -433,7 +476,7 @@ class Flickrfs(Fuse):
 		self._mkdir("/tags")
 		self._mkdir("/tags/personal")
 		self._mkdir("/tags/public")
-		background(self.sets_thread)
+		background(timerThread, self.sets_thread, self.sync_sets_thread, sets_sync_int) #sync every 2 minutes
 
 	def writeMetaInfo(self, id, INFO):
 		#The metadata may be unicode strings, so we need to encode them on write
@@ -467,19 +510,63 @@ class Flickrfs(Fuse):
 		log.info("sets_thread: started")
 		self._mkdir("/sets")
 		for a in self.transfl.getPhotosetList():
-			title = a.title[0].elementText.replace('/', ' ')
+			title = a.title[0].elementText.replace('/', '_')
 			curdir = "/sets/" + title
 			if title.strip()=='':
 				curdir = "/sets/" + a['id']
 			set_id = a['id']
 			self._mkdir(curdir, id=set_id)
 			for b in self.transfl.getPhotosFromPhotoset(set_id):
-				self._mkfileWithMeta(curdir, b)
-	
-	def stream_thread(self, path):
+				self._mkfileWithMeta(curdir, b['id'])
+		log.info('Sets population finished')
+
+	def _sync_code(self, psetOnline, curdir):
+		for b in psetOnline:
+			imageTitle = b['title'].replace('/', '_')
+			imageTitle = imageTitle[:32] + '_' + str(b['id']) + '.' + str(b['originalformat'])
+			path = "%s/%s"%(curdir, imageTitle)
+			try:
+				inode = self.inodeCache[path]
+				if inode.mtime != int(b['lastupdate']):
+					log.debug("Image %s changed"%(path))
+					self.inodeCache.pop(path)
+					self._mkfileWithMeta(curdir, b['id'])
+			except: #Image inode not present in the set
+				log.debug("New image found: %s"%(path))
+				self._mkfileWithMeta(curdir, b['id'])
+		psetLocal = self.getdir(curdir, False)
+		if len(psetOnline) < len(psetLocal): #Photo has been deleted online
+			log.info('%s photos have been deleted online'%(len(psetLocal)-len(psetOnline),))
+			for b in psetOnline:
+				imageTitle = b['title'].replace('/', '_')
+				imageTitle = imageTitle[:32] + '_' + str(b['id']) + '.' + str(b['originalformat'])
+				psetLocal.remove((imageTitle,0))
+			for c in psetLocal:
+				log.info('deleting:%s'%(c[0],))
+				self.unlink(curdir+'/'+c[0])
+
+	def sync_sets_thread(self):
+		log.info("sync_sets_thread: started")
+		for a in self.transfl.getPhotosetList():
+			title = a.title[0].elementText.replace('/', '_')
+			curdir = "/sets/" + title
+			if title.strip()=='':
+				curdir = "/sets/" + a['id']
+			set_id = a['id']
+			psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
+			self._sync_code(psetOnline, curdir)
+		log.info('sync_sets_thread finished')
+
+	def sync_stream_thread(self):
+		log.info('sync_stream_thread started')
+		psetOnline = self.transfl.getPhotoStream(self.NSID)
+		self._sync_code(psetOnline, '/stream')
+		log.info('sync_stream_thread finished')
+			
+	def stream_thread(self):
 		log.info("stream_thread started")
 		for b in self.transfl.getPhotoStream(self.NSID):
-			self._mkfileWithMeta(path, b)
+			self._mkfileWithMeta('/stream', b['id'])
 			
 	def tags_thread(self, path):
 		ind = string.rindex(path, '/')
@@ -494,23 +581,23 @@ class Flickrfs(Fuse):
 		else:
 			user_id = None
 		for b in self.transfl.getTaggedPhotos(sendtagList, user_id):
-			self._mkfileWithMeta(path, b)
+			self._mkfileWithMeta(path, b['id'])
 
-	def _mkfileWithMeta(self, path, b):
-		INFO = self.transfl.getPhotoInfo(b['id'])
+	def _mkfileWithMeta(self, path, id):
+		INFO = self.transfl.getPhotoInfo(id)
 		if INFO==None:
-			log.error("Can't retrieve info:%s:"%(b['id'],))
+			log.error("Can't retrieve info:%s:"%(id,))
 			return
-		title = b['title'].replace('/', '_')
+		title = INFO[4].replace('/', '_')
 		#if title.strip()=='':
 		title = title[:32]   #Only allow 32 characters
-		title += '_' + str(b['id'])
+		title += '_' + str(id)
 		ext = '.' + INFO[0]
 		if os.path.splitext(title)[1]!=ext:
 			title = title + ext
-		self.writeMetaInfo(b['id'], INFO) #Write to a localfile
-		self._mkfile(path +"/" + title, id=b['id'],
-			mode=INFO[1], comm_meta=INFO[2], mtime=int(b['lastupdate']), ctime=int(b['dateupload']))
+		self.writeMetaInfo(id, INFO) #Write to a localfile
+		self._mkfile(path +"/" + title, id=id,
+			mode=INFO[1], comm_meta=INFO[2], mtime=INFO[11], ctime=INFO[10])
 
 	def _parsepathid(self, path, id=""):
 		#Path and Id may be unicode strings, so encode them to utf8 now before
@@ -549,14 +636,13 @@ class Flickrfs(Fuse):
 			self.inodeCache[path] = FileInode(path, id, size=size)
 
 	def getattr(self, path):
-		log.debug("getattr:" + path + ":")
+		#log.debug("getattr:" + path + ":")
 		if path.startswith('/sets/'):
 			templist = path.split('/')
 			ind = templist.index('sets')
 			setName = templist[ind+1].split(':')[0]
 			templist[2] = setName
 			path = '/'.join(templist)
-			log.debug("getattr:After modifying:%s:" % (path))
 
 		inode=self.getInode(path)
 		if inode:
@@ -574,16 +660,22 @@ class Flickrfs(Fuse):
 		log.debug("readlink")
 		return os.readlink(path)
 	
-	def getdir(self, path):
+	def getdir(self, path, hidden=True):
 		log.debug("getdir:" + path)
-		templist = ['.', '..']
+		templist = []
+		if hidden:
+			templist = ['.', '..']
 		for a in self.inodeCache.keys():
 			ind = a.rindex('/')
 			if path=='/':
 				path=""
 			if path==a[:ind]:
 				name = a.split('/')[-1]
-				if name!="":
+				if name=="":
+					continue
+				if hidden and name.startswith('.'):
+					templist.append(name)
+				elif not name.startswith('.'):
 					templist.append(name)
 		return map(lambda x: (x,0), templist)
 
@@ -602,7 +694,7 @@ class Flickrfs(Fuse):
 				pPath = path[:ind]
 				pinode = self.getInode(pPath)
 				self.transfl.removePhotofromSet(photoId=inode.photoId, photosetId=pinode.setId)
-	
+				log.info("Photo %s removed from set"%(path,))
 			del inode
 		else:
 			log.error("Can't find what you want to remove")
@@ -668,6 +760,8 @@ class Flickrfs(Fuse):
 
 		#Read from path
 		inode = self.getInode(path)
+		if inode is None or not hasattr(inode, 'photoId'):
+			return
 		fname = os.path.join(flickrfsHome, '.'+inode.photoId)
 		f = open(fname, 'r')
 		buf = f.read()
@@ -675,6 +769,8 @@ class Flickrfs(Fuse):
 		
 		#Now write to path1
 		inode = self.getInode(path1)
+		if inode is None or not hasattr(inode, 'photoId'):
+			return
 		fname = os.path.join(flickrfsHome, '.'+inode.photoId)
 		f = open(fname, 'w')
 		f.write(buf)
@@ -684,9 +780,38 @@ class Flickrfs(Fuse):
 		if retinfo.count('Error')>0:
 			log.error(retinfo)
 		
-	def link(self, path, path1):
-		log.debug("link")
-		
+	def link(self, srcpath, destpath):
+		log.debug("link: %s:%s"%(srcpath, destpath))
+		#Add image from stream to set, w/o retrieving
+		slist = srcpath.split('/')
+		sname_file = slist.pop(-1)
+		dlist = destpath.split('/')
+		dname_file = dlist.pop(-1)
+		error = 0
+		if sname_file=="" or sname_file.startswith('.'):
+			error = 1
+		if dname_file=="" or dname_file.startswith('.'):
+			error = 1
+		if not destpath.startswith('/sets/'):
+			error = 1
+		if error is 1:
+			log.error("Linking is allowed only between 2 image files")
+			return
+		sinode = self.getInode(srcpath)
+		self._mkfile(destpath, id=sinode.id, mode=sinode.mode, comm_meta=sinode.comm_meta, mtime=sinode.mtime, ctime=sinode.ctime)
+		parentPath = '/'.join(dlist)
+		pinode = self.getInode(parentPath)
+		if pinode.setId==0:
+			try:
+				pinode.setId = self.transfl.createSet(parentPath, sinode.photoId)
+			except:
+				e = OSError("Can't create a new set")
+				e.errno = EIO
+				raise e
+		else:
+			self.transfl.put2Set(pinode.setId, sinode.photoId)
+
+	
 	def chmod(self, path, mode):
 		log.debug("chmod. Oh! So, you found use as well!")
 		inode = self.getInode(path)
@@ -770,7 +895,7 @@ class Flickrfs(Fuse):
 				raise e
 		elif path=='/stream':
 			self._mkdir(path)
-			background(self.stream_thread, path)
+			background(timerThread, self.stream_thread, self.sync_stream_thread, stream_sync_int)
 			
 		else:
 			e = OSError("Not allowed to create directory:%s:"%(path))
@@ -974,7 +1099,12 @@ class Flickrfs(Fuse):
 						raise e
 				else:
 					self.transfl.put2Set(pinode.setId, id)
-				
+		if len(buf)<4096:
+			templist = path.split('/')
+			templist.pop(-1)
+			parentPath = '/'.join(templist)
+			self.inodeCache.pop(path)
+			self._mkfileWithMeta(parentPath, id)
 		return len(buf)
 
 	def getInode(self, path):
