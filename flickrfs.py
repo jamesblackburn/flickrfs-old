@@ -97,10 +97,14 @@ def timerThread(func, func1, interval):
 	'''Execute func now, followed by func1 every interval seconds
 	'''
 	t = threading.Timer(0.0, func)
-	t.run()
+	try:
+		t.run()
+	except: pass
 	while(interval):
 		t = threading.Timer(interval, func1)
-		t.run()
+		try:
+			t.run()
+		except: pass
 		
 #Transactions with flickr, wraps FlickrAPI calls in Flickfs-specialized functions.
 class TransFlickr: 
@@ -265,6 +269,9 @@ class TransFlickr:
 		public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
 		friends = mode>>3 & 1 #Set friends and family 4(always), 2(family), 1(friends)
 		family = mode>>4 & 1
+		if len(comm_meta)<2: #This wd patch string index out of range bug, caused 
+							 #because some photos may not have comm_meta value set.
+			comm_meta="33"
 		rsp = self.fapi.photos_setPerms(auth_token=self.authtoken, is_public=str(public),
 			is_friend=str(friends), is_family=str(family), perm_comment=comm_meta[0],
 			perm_addmeta=comm_meta[1], photo_id=photoId)
