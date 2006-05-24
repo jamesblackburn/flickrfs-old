@@ -1,3 +1,4 @@
-#Placed as $HOMEDIR/.flickrfs/config.txt
 [configuration]
-image.size:1024x760
+image.size:
+sets.sync.int:120
+stream.sync.int:120
