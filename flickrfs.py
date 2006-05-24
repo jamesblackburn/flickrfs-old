@@ -379,13 +379,23 @@ class TransFlickr:
 		return rsp.photoset[0].photo
 						
 	def getPhotoStream(self, user_id):
-		rsp = self.fapi.photos_search(auth_token=self.authtoken, user_id=user_id, per_page="500", extras=self.extras)
-		if not rsp:
-			log.error("Can't retrive photos from your stream:" + rsp.errormsg)
-			return []
-		if not hasattr(rsp.photos[0], 'photo'):
-			return []
-		return rsp.photos[0].photo
+		retList = []
+		pageNo = 1
+		maxPage = 1
+		while pageNo<=maxPage:
+			log.info("maxPage:%s pageNo:%s"%(maxPage, pageNo))
+			rsp = self.fapi.photos_search(auth_token=self.authtoken, user_id=user_id, per_page="500", page=str(pageNo), extras=self.extras)
+			if not rsp:
+				log.error("Can't retrive photos from your stream:" + rsp.errormsg)
+				return retList
+			if not hasattr(rsp.photos[0], 'photo'):
+				log.error("Doesn't have attribute photos. Page requested: %s"%(pageNo,))
+				return retList
+			for a in rsp.photos[0].photo:
+				retList.append(a)
+			maxPage = int(rsp.photos[0]['pages'])
+			pageNo = pageNo + 1
+		return retList
  
 	def getTaggedPhotos(self, tags, user_id=None):
 		kw = kwdict(auth_token=self.authtoken, tags=tags, tag_mode="all", extras=self.extras, per_page="500")
@@ -521,6 +531,7 @@ class Flickrfs(Fuse):
 		log.info('Sets population finished')
 
 	def _sync_code(self, psetOnline, curdir):
+		psetLocal = self.getdir(curdir, False)
 		for b in psetOnline:
 			imageTitle = b['title'].replace('/', '_')
 			imageTitle = imageTitle[:32] + '_' + str(b['id']) + '.' + str(b['originalformat'])
@@ -531,19 +542,15 @@ class Flickrfs(Fuse):
 					log.debug("Image %s changed"%(path))
 					self.inodeCache.pop(path)
 					self._mkfileWithMeta(curdir, b['id'])
+				psetLocal.remove((imageTitle,0))
 			except: #Image inode not present in the set
 				log.debug("New image found: %s"%(path))
 				self._mkfileWithMeta(curdir, b['id'])
-		psetLocal = self.getdir(curdir, False)
-		if len(psetOnline) < len(psetLocal): #Photo has been deleted online
-			log.info('%s photos have been deleted online'%(len(psetLocal)-len(psetOnline),))
-			for b in psetOnline:
-				imageTitle = b['title'].replace('/', '_')
-				imageTitle = imageTitle[:32] + '_' + str(b['id']) + '.' + str(b['originalformat'])
-				psetLocal.remove((imageTitle,0))
-			for c in psetLocal:
-				log.info('deleting:%s'%(c[0],))
-				self.unlink(curdir+'/'+c[0], False)
+		if len(psetLocal)>0:
+			log.info('%s photos have been deleted online'%(len(psetLocal),))
+		for c in psetLocal:
+			log.info('deleting:%s'%(c[0],))
+			self.unlink(curdir+'/'+c[0], False)
 
 	def sync_sets_thread(self):
 		log.info("sync_sets_thread: started")
