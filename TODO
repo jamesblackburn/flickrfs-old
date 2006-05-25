@@ -11,7 +11,9 @@ xemacs
 mounted obv). This will mean flickrfs can automatically detect any new
 photos uploaded to flickr (directly), and show them. Also means, that any
 change in meta-data will be reflected as well. Though search results i.e.
-tags/public or tags/personal need not be affected (or even synced).
+tags/public or tags/personal need not be affected (or even synced). -DONE
 
 It wd be best to do this using a command rather than a time bound
-recurring thread. This wd prevent any inconsistencies.
+recurring thread. This wd prevent any inconsistencies. 
+  -I realized that a time bound method is more feasible. It doesn't
+create any inconsistencies, and is effortless. Preferable. -Manish
