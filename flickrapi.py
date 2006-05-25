@@ -49,7 +49,7 @@ import httplib
 import os.path
 import xml.dom.minidom
 import urllib2
-
+import socket
 DEBUG = 0
 ########################################################################
 # XML functionality
@@ -171,7 +171,6 @@ class FlickrAPI:
 	flickrRESTForm = "/services/rest/"
 	flickrAuthForm = "/services/auth/"
 	flickrUploadForm = "/services/upload/"
-
 	#-------------------------------------------------------------------
 	def __init__(self, apiKey, secret):
 		"""Construct a new FlickrAPI instance for a given API key and secret."""
@@ -179,7 +178,7 @@ class FlickrAPI:
 		self.secret = secret
 
 		self.__handlerCache={}
-
+		socket.setdefaulttimeout(10)
 	#-------------------------------------------------------------------
 	def __sign(self, data):
 		"""Calculate the flickr signature for a set of params.
@@ -232,24 +231,23 @@ class FlickrAPI:
 	
 				#API Key is used in all the methods. So, instead of specifying it as 
 				#parameter in calling function, we can append it over here by default.
-				#Token eq. to Authentication is not required for all methods. So, 
+				#Token eq. to Authentication is not required for ALL methods. So, 
 				#better specify when needed. -Manish
 
 				if not 'api_key' in arg: arg["api_key"] = _self.apiKey
 #				if not 'auth_token' in arg and hasattr(_self, 'token'): arg['auth_token'] = _self.token
-				postData = urllib.urlencode(arg) + "&api_sig=" + \
-					_self.__sign(arg)
+
+				postData = str(urllib.urlencode(arg)) + "&api_sig=" + \
+					str(_self.__sign(arg))
 				if DEBUG:
 					print "--url---------------------------------------------"
 					print url
 					print "--postData----------------------------------------"
 					print postData
-				data = ""
-				try:
-					f = urllib.urlopen(url, postData)
-					data = f.read()
-				except KeyError:
-					print 'Ctrl+C. Terminated by User'
+				data = '<rsp stat="ok"></rsp>'
+				req = urllib2.Request(url, postData)
+				f = urllib2.urlopen(req)
+				data = f.read()
 				if DEBUG:
 					print "--response----------------------------------------"
 					print data
