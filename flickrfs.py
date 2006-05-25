@@ -66,6 +66,10 @@ try:
 	stream_sync_int = float(cp.get('configuration', 'stream.sync.int'))
 except:
 	pass
+try:
+	browserName = cp.get('configuration', 'browser')
+except:
+	pass
 
 #Utility functions.
 def _log_exception_wrapper(func, *args, **kw):
@@ -181,6 +185,7 @@ class TransFlickr:
 			log.info("Uploading original size of image: " + filepath)
 
 		log.info("Uploading file: " + filepath + ":with data of len:" + str(len(bufData)))
+		log.info("and tags:%s"%(str(taglist),))
 		log.info("Permissions:Family:%s Friends:%s Public:%s"%(family,friends,public))
 		rsp = self.fapi.upload(filename=filepath, jpegData=bufData,
 					title=os.path.splitext(os.path.basename(filepath))[0],
@@ -668,12 +673,12 @@ class Flickrfs(Fuse):
 
 	def getattr(self, path):
 		#log.debug("getattr:" + path + ":")
+		templist = path.split('/')
 		if path.startswith('/sets/'):
-			templist = path.split('/')
-			ind = templist.index('sets')
-			setName = templist[ind+1].split(':')[0]
-			templist[2] = setName
-			path = '/'.join(templist)
+			templist[2] = templist[2].split(':')[0]
+		elif path.startswith('/stream'):
+			templist[1] = templist[1].split(':')[0]
+		path = '/'.join(templist)
 
 		inode=self.getInode(path)
 		if inode:
@@ -873,22 +878,22 @@ class Flickrfs(Fuse):
 	def mknod(self, path, mode, dev):
 		""" Python has no os.mknod, so we can only do some things """
 		log.debug("mknod? OK! Had a close encounter!!:%s:"%(path,))
-		ind = path.rindex('/')
-		name_file = path[ind+1:]
-		if name_file.startswith('.'):
-			if name_file.count('.meta')>0:
-				log.debug("mknod for meta file? No use!")
-				return
-					#Metadata files will automatically be created. 
-					#mknod can't be used for them
+		templist = path.split('/')
+		name_file = templist[-1]
+		if name_file.startswith('.') and name_file.count('.meta')>0:
+			log.debug("mknod for meta file? No use!")
+			return
+			#Metadata files will automatically be created. 
+			#mknod can't be used for them
 
 		if path.startswith('/sets/'):
-			templist = path.split('/')
-			ind = templist.index('sets')
-			setName = templist[ind+1].split(':')[0]
-			templist[2] = setName
-			path = '/'.join(templist)
-			log.debug("mknod:After modifying:%s:" % (path))
+			templist[2] = templist[2].split(':')[0]
+		elif path.startswith('/stream'):
+			templist[1] = templist[1].split(':')[0]
+		path = '/'.join(templist)
+
+		log.debug("mknod:After modifying:%s:" % (path))
+			
 
 		#Lets guess what kind of a file is this. 
 		#Is it an image file? or, some other temporary file
@@ -947,13 +952,13 @@ class Flickrfs(Fuse):
 			log.debug('open:non-image file found')
 			return 0
 		
+		templist = path.split('/')
 		if path.startswith('/sets/'):
-			templist = path.split('/')
-			ind = templist.index('sets')
-			setName = templist[ind+1].split(':')[0]
-			templist[2] = setName
-			path = '/'.join(templist)
-			log.debug("open:After modifying:%s:" % (path))
+			templist[2] = templist[2].split(':')[0]
+		elif path.startswith('/stream'):
+			templist[1] = templist[1].split(':')[0]
+		path = '/'.join(templist)
+		log.debug("open:After modifying:%s:" % (path))
 		
 		inode = self.getInode(path)
 		if inode.photoId=="NEW": #Just skip if new (i.e. uploading)
@@ -1044,7 +1049,7 @@ class Flickrfs(Fuse):
 			inode = self.getInode(path)
 #			ext = name_file[metaInd+5:]
 #			print 'extension:', ext
-			fname = os.path.join(flickrfsHome, '.'+inode.photoId) #+ext
+			fname = os.path.join(flickrfsHome, '.'+inode.photoId) #ext
 			log.debug("Writing to :%s:"%(fname,))
 			f = open(fname, 'r+')
 			f.seek(off)
@@ -1076,14 +1081,20 @@ class Flickrfs(Fuse):
 			f.close()
 			inode.size = os.path.getsize(fname)
 			return len(buf)
-		
-		if path.startswith('/tags/'):
+
+		templist = path.split('/')
+		if path.startswith('/tags'):
+			e = OSError("Copying not allowed")
+			e.errno = EIO
+			raise e
+			
+		if path.startswith('/stream'):
+			tags = templist[1].split(':')
+			templist[1] = tags.pop(0)
+			path = '/'.join(templist)
 			inode = self.getInode(path)
 			inode.buf += buf
 			if len(buf) < 4096:
-				eind = path.rindex('/')
-				sind = path.rindex('/',0,eind)
-				tags = string.split(path[sind+1:eind], ':')
 				tags = [ '"%s"'%(a,) for a in tags]
 				tags.append('flickrfs')
 				taglist = ' '.join(tags)
@@ -1093,9 +1104,7 @@ class Flickrfs(Fuse):
 				inode.photoId = id
 
 		elif path.startswith('/sets/'):
-			templist = path.split('/')
-			ind = templist.index('sets')
-			setnTags = templist[ind+1].split(':')
+			setnTags = templist[2].split(':')
 			setName = setnTags.pop(0)
 			templist[2] = setName
 			path = '/'.join(templist)
@@ -1125,11 +1134,16 @@ class Flickrfs(Fuse):
 						raise e
 				else:
 					self.transfl.put2Set(pinode.setId, id)
+		
+		log.debug("After modifying write:%s:%s"%(path, off))
 		if len(buf)<4096:
 			templist = path.split('/')
 			templist.pop(-1)
 			parentPath = '/'.join(templist)
-			self.inodeCache.pop(path)
+			try:
+				self.inodeCache.pop(path)
+			except:
+				pass
 			self._mkfileWithMeta(parentPath, id)
 		return len(buf)
 
