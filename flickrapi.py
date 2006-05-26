@@ -187,12 +187,16 @@ class FlickrAPI:
 		        {"api_key":"AAAA", "auth_token":"TTTT"}
 
 		"""
-		dataName = self.secret
+		dataName = ""
+		if self.secret is not None:
+			dataName = self.secret
 		#print data
 		keys = data.keys()
 		keys.sort()
 
-		for a in keys: dataName += (a + data[a])
+		for a in keys:
+			if data[a] is not None:
+				dataName += (a + data[a])
 		#print 'dataName:', dataName
 		hash = md5.new()
 		hash.update(dataName)
