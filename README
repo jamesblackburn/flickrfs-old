@@ -12,7 +12,14 @@
  through this application/derived apps/any 3rd party apps using this key. 
 ===============================================================================
 
-Note that this is just a release log. 
+===================DOCUMENTATION===========================================
+Please refer to http://manishrjain.googlepages.com/flickrfs for up-to-date
+documentation. 
+	-Manish
+
+
+================================================================================
+Note that following is just a release log. 
 Please check out the latest documentation at: http://flickrfs.sourceforge.net
 
  v0.9 - Initial release
