@@ -135,7 +135,7 @@ class TransFlickr:
 			log.error('Not able to authorize. Exiting...')
 			sys.exit(-1)
 				#Add some authorization checks here(?)
-		print "Authorization complete. Retrieving photos..."
+		print "Authorization complete."
 		log.info('Authorization complete')
 
 	def imageResize(self, bufData):
@@ -530,6 +530,7 @@ class Flickrfs(Fuse):
 			running in foreground, you can have threads
 			"""	
 		log.info("sets_thread: started")
+		print "Populating sets..."
 		self._mkdir("/sets")
 		for a in self.transfl.getPhotosetList():
 			title = a.title[0].elementText.replace('/', '_')
@@ -541,6 +542,7 @@ class Flickrfs(Fuse):
 			for b in self.transfl.getPhotosFromPhotoset(set_id):
 				self._mkfileWithMeta(curdir, b['id'])
 		log.info('Sets population finished')
+		print "Sets population complete."
 
 	def _sync_code(self, psetOnline, curdir):
 		psetLocal = self.getdir(curdir, False)
@@ -600,9 +602,11 @@ class Flickrfs(Fuse):
 			
 	def stream_thread(self):
 		log.info("stream_thread started")
+		print "Populating photostream"
 		for b in self.transfl.getPhotoStream(self.NSID):
 			self._mkfileWithMeta('/stream', b['id'])
 		log.info("stream_thread finished")
+		print "Photostream population finished."
 			
 	def tags_thread(self, path):
 		ind = string.rindex(path, '/')
