@@ -143,7 +143,7 @@ class TransFlickr:
     f = open(im, 'w')
     f.write(bufData)
     f.close()
-    cmd = 'identify -format "%w" %s'%(im,)
+    cmd = 'identify -format "%%w" %s'%(im,)
     status,ret = commands.getstatusoutput(cmd)
     if status!=0:
       print "identify command not found. Install Imagemagick"
