@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #===============================================================================
 #  flickrfs - Virtual Filesystem for Flickr
 #  Copyright (c) 2005 Manish Rai Jain  <manishrjain@gmail.com>
@@ -40,6 +39,16 @@ else:
   # Remove previous metadata files from ~/.flickrfs
   for a in glob(os.path.join(flickrfsHome, '.*')):
     os.remove(os.path.join(flickrfsHome, a))
+
+# Added by Varun Hiremath
+if not os.path.exists(flickrfsHome + "/config.txt"):
+  fconfig = open(flickrfsHome+"/config.txt",'w')
+  fconfig.write("[configuration]\n")
+  fconfig.write("browser:/usr/bin/firefox\n")
+  fconfig.write("image.size:\n")
+  fconfig.write("sets.sync.int:300\n")
+  fconfig.write("stream.sync.int:300\n")
+  fconfig.close()
 
 # Set up logging
 log = logging.getLogger('flickrfs')
