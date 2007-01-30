@@ -196,7 +196,7 @@ class FlickrAPI:
 
 		for a in keys:
 			if data[a] is not None:
-				dataName += (a + data[a])
+				dataName += "%s%s" % (a, data[a])
 		#print 'dataName:', dataName
 		hash = md5.new()
 		hash.update(dataName)
@@ -250,6 +250,7 @@ class FlickrAPI:
 					print postData
 				data = '<rsp stat="ok"></rsp>'
 				req = urllib2.Request(url, postData)
+#				socket.defaulttimetout(60)
 				f = urllib2.urlopen(req)
 				data = f.read()
 				if DEBUG:
@@ -357,7 +358,7 @@ class FlickrAPI:
 				jpegData = fp.read()
 				fp.close()
 
-			postData = body.encode("utf_8") + jpegData + \
+			postData = body.encode("utf_8") + jpegData + "\r\n" + \
 				("--%s--" % (boundary)).encode("utf_8")
 		
 		
