@@ -11,6 +11,9 @@
 # through this application/derived apps/any 3rd party apps using this key. 
 #===============================================================================
 
+__author__ =  "Manish Rai Jain (manishrjain@gmail.com)"
+__license__ = "GPLv2 (details at http://www.gnu.org/licenses/licenses.html#GPL)"
+
 import thread, string, ConfigParser, mimetypes, codecs
 import time, logging, logging.handlers, os, sys
 from glob import glob
@@ -19,7 +22,7 @@ from traceback import format_exc
 from fuse import Fuse
 import threading
 import random, commands
-
+from urllib2 import URLError
 from transactions import TransFlickr
 import inodes
 
@@ -109,8 +112,6 @@ def background(func, *args, **kw):
     Any exceptions thrown are logged as errors, and the traceback is logged.
     """
     thread.start_new_thread(_log_exception_wrapper, (func,)+args, kw)
-
-def kwdict(**kw): return kw
 
 def timerThread(func, func1, interval):
   '''Execute func now, followed by func1 every interval seconds
@@ -221,50 +222,75 @@ class Flickrfs(Fuse):
     f.close()
     return fileSize
 
+  def __populate_set(self, set_id, curdir):
+    try:
+      photosInSet = self.transfl.getPhotosFromPhotoset(set_id)
+    except URLError, detail:
+      log.error("Retrieving photos for set %s timed out with error %s" % (curdir, detail))
+      return
+    for b,p in photosInSet.iteritems():
+      info = self.transfl.parseInfoFromPhoto(b,p)
+      self._mkfileWithMeta(curdir, info)
+    log.info("Set %s populated." % curdir)
+
   def sets_thread(self):
     """
       The beauty of the FUSE python implementation is that with the python interp
       running in foreground, you can have threads
-      """  
+    """
+    print "Sets are being populated in the background."
     log.info("sets_thread: started")
-    print "Populating sets..."
     self._mkdir("/sets")
     for a in self.transfl.getPhotosetList():
       title = a.title[0].elementText.replace('/', '_')
+      log.info("Populating set %s." % title)
       curdir = "/sets/" + title
       if title.strip()=='':
         curdir = "/sets/" + a['id']
       set_id = a['id']
       self._mkdir(curdir, id=set_id)
-      for b,p in self.transfl.getPhotosFromPhotoset(set_id).iteritems():
-        info = self.transfl.parseInfoFromPhoto(b,p)
-        self._mkfileWithMeta(curdir, info)
-    log.info('Sets population finished')
-    print "Sets population complete."
+      background(self.__populate_set, set_id, curdir)
 
   def _sync_code(self, psetOnline, curdir):
-    psetLocal = self.getdir(curdir, False)
+    psetLocal = set(map(lambda x: x[0], self.getdir(curdir, False)))
     for b in psetOnline:
       info = self.transfl.parseInfoFromPhoto(b)
-      imageTitle = info.get('title','').replace('/', '_')
-      imageTitle = imageTitle[:32] + '_' + str(b['id']) + '.' + str(b['originalformat'])
+      imageTitle = info.get('title','')
+      imageTitle = self.__getImageTitle(imageTitle, b['id'], b['originalformat'])
       path = "%s/%s"%(curdir, imageTitle)
-      try:
-        inode = self.inodeCache[path]
-        if inode.mtime != int(info.get('dupdate')):
-          log.debug("Image %s changed"%(path))
-          self.inodeCache.op(path)
-          self._mkfileWithMeta(curdir, info)
-        psetLocal.remove((imageTitle,0))
-      except: #Image inode not present in the set
+      inode = self.inodeCache.get(path)
+      # This exception throwing is just for debugging.
+      if inode == None and self.inodeCache.has_key(path):
+        e = OSError("Path %s present in inodeCache" % path)
+        e.errno = ENOENT
+        raise e
+      if inode == None: # Image inode not present in the set.
         log.debug("New image found: %s"%(path))
         self._mkfileWithMeta(curdir, info)
+      else:
+        if inode.mtime != int(info.get('dupdate')):
+          log.debug("Image %s changed"%(path))
+          self.inodeCache.pop(path)
+          if self.inodeCache.has_key(path + ".meta"):
+            self.inodeCache.pop(path + ".meta")
+          self._mkfileWithMeta(curdir, info)
+        psetLocal.discard(imageTitle)
     if len(psetLocal)>0:
-      log.info('%s photos have been deleted online'%(len(psetLocal),))
+      log.info('%s photos have been deleted online' % len(psetLocal))
     for c in psetLocal:
-      log.info('deleting:%s'%(c[0],))
-      self.unlink(curdir+'/'+c[0], False)
+      log.info('deleting:%s' % c)
+      self.unlink("%s/%s" % (curdir, c), False)
 
+  def __sync_set_in_background(self, set_id, curdir):
+    log.info("Syncing set %s" % curdir)
+    try:
+      psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
+    except URLError, detail:
+      log.error("Sync of set %s timed out with error message: %s" % (curdir, detail))
+      return
+    self._sync_code(psetOnline, curdir)
+    log.info("Set %s sync successfully finished." % curdir)
+    
   def sync_sets_thread(self):
     log.info("sync_sets_thread: started")
     setListOnline = self.transfl.getPhotosetList()
@@ -289,8 +315,7 @@ class Flickrfs(Fuse):
       if title.strip()=='':
         curdir = "/sets/" + a['id']
       set_id = a['id']
-      psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
-      self._sync_code(psetOnline, curdir)
+      background(self.__sync_set_in_background, set_id, curdir)
     log.info('sync_sets_thread finished')
 
   def sync_stream_thread(self):
@@ -342,17 +367,19 @@ class Flickrfs(Fuse):
     else:
       return 0744 # private
 
+  def __getImageTitle(self, title, id, format = "jpg"):
+    temp = title.replace('/', '')
+    return "%s_%s.%s" % (temp[:32], id, format)
+
   def _mkfileWithMeta(self, path, info):
     # Don't retrieve the photo info here.
 #    INFO = self.transfl.getPhotoInfo(id)
     if info==None:
       return
-    id = info.get("id", "")
     title = info.get("title", "")
-    title = "%s_%s" % (title[:32], id)   #Only allow 32 characters
-    ext = '.' + info.get("format", "jpg")
-    if os.path.splitext(title)[1]!=ext:
-      title = title + ext
+    id =    info.get("id", "")
+    ext =   info.get("format", "jpg")
+    title = self.__getImageTitle(title, id, ext)
 #    self.writeMetaInfo(id, INFO) #Write to a localfile
     # Refactor this section of code, so that it can be called
     # from read.
@@ -372,7 +399,7 @@ class Flickrfs(Fuse):
     if id!=0: id = id.encode('utf8')
     parentDir, name = os.path.split(path)
     if parentDir=='':
-      parentDir = '/#'
+      parentDir = '/'
     log.debug("parentDir:" + parentDir + ":")
     return path, id, parentDir, name
 
@@ -452,7 +479,10 @@ class Flickrfs(Fuse):
     log.debug("unlink:%s:" % (path))
     if self.inodeCache.has_key(path):
       inode = self.inodeCache.pop(path)
-      
+      # Remove the meta data file as well if it exists
+      if self.inodeCache.has_key(path + ".meta"):
+        self.inodeCache.pop(path + ".meta")
+
       typesinfo = mimetypes.guess_type(path)
       if typesinfo[0]==None or typesinfo[0].count('image')<=0:
         log.debug("unlinked a non-image file:%s:"%(path,))

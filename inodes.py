@@ -11,9 +11,12 @@
 # through this application/derived apps/any 3rd party apps using this key. 
 #===============================================================================
 
+__author__ =  "Manish Rai Jain (manishrjain@gmail.com)"
+__license__ = "GPLv2 (details at http://www.gnu.org/licenses/licenses.html#GPL)"
+
 import os, sys, time
 from stat import *
-import bsddb, cPickle
+import cPickle
 
 DEFAULTBLOCKSIZE = 4*1024 # 4 KB
 
@@ -88,29 +91,43 @@ class ImageCache:
 class InodeCache(dict):
   def __init__(self, dbPath):
     dict.__init__(self)
-    self.db = bsddb.btopen(dbPath, flag='c')
+    try:
+      import bsddb
+      # If bsddb is available, utilize that package
+      # and store the inodes in database.
+      self.db = bsddb.btopen(dbPath, flag='c')
+    except:
+      # Otherwise, store the inodes in memory.
+      self.db = {}
     # Keep the keys in memory.
     self.keysCache = set()
   
-  def __getitem__(self, key):
-    valObjStr = self.db.get(key)
-    if valObjStr != None:
-      return cPickle.loads(valObjStr)
-    else:
-      return None
+  def __getitem__(self, key, d=None):
+    # key k may be unicode, so convert it to
+    # a normal string first.
+    if not self.has_key(key):
+      return d
+    valObjStr = self.db.get(str(key))
+    return cPickle.loads(valObjStr)
 
   def __setitem__(self, key, value):
     self.keysCache.add(key)
-    self.db[key] = cPickle.dumps(value)
+    self.db[str(key)] = cPickle.dumps(value)
   
+  def get(self, k, d=None):
+    return self.__getitem__(k, d)
+
   def keys(self):
     return list(self.keysCache)
   
   def pop(self, k, *args):
-    valObjStr = self.db.pop(k, *args)
+    # key k may be unicode, so convert it to
+    # a normal string first.
+    valObjStr = self.db.pop(str(k), *args)
     self.keysCache.discard(k)
     if valObjStr != None:
       return cPickle.loads(valObjStr)
 
   def has_key(self, k):
-    return self.keysCache.__contains__(k)
+    return k in self.keysCache
+

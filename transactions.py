@@ -11,6 +11,9 @@
 # through this application/derived apps/any 3rd party apps using this key. 
 #===============================================================================
 
+__author__ =  "Manish Rai Jain (manishrjain@gmail.com)"
+__license__ = "GPLv2 (details at http://www.gnu.org/licenses/licenses.html#GPL)"
+
 from flickrapi import FlickrAPI
 from traceback import format_exc
 import urllib2
@@ -22,6 +25,9 @@ import os
 flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
 flickrSecret = "3fbf7144be7eca28"          # shared "secret"
 browserName = "/usr/bin/firefox"           # for out-of-band auth inside a web browser
+
+# Utility functions
+def kwdict(**kw): return kw
 
 #Transactions with flickr, wraps FlickrAPI calls in Flickfs-specialized functions.
 class TransFlickr: 
@@ -304,7 +310,6 @@ class TransFlickr:
       rsp = self.fapi.photosets_getPhotos(auth_token=self.authtoken,
           photoset_id=photoset_id, extras=self.extras, privacy_filter=str(i))
       if not rsp:
-#        log.error("No photos from photoset %s: %s" % (photoset_id, rsp.errormsg))
         continue
       for p in rsp.photoset[0].photo:
         photosPermsMap[p] = str(i)
