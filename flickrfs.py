@@ -140,6 +140,11 @@ class Flickrfs(Fuse):
     self.NSID = ""
     self.transfl = TransFlickr(log)
 
+    # Set some variables to be utilized by statfs function.
+    self.statfsCounter = -1
+    self.max = 0L
+    self.used = 0L
+
     self.NSID = self.transfl.getUserId()
     if self.NSID==None:
       log.error("Initialization:Can't retrieve user information")
@@ -160,6 +165,11 @@ class Flickrfs(Fuse):
 
 
   def imageResize(self, bufData):
+    # If no resizing information is present, then return the buffer directly.
+    if GetResizeStr() == "":
+      return bufData
+
+    # Else go ahead and do the conversion.
     im = '/tmp/flickrfs-' + str(int(random.random()*1000000000))
     f = open(im, 'w')
     f.write(bufData)
@@ -369,7 +379,11 @@ class Flickrfs(Fuse):
 
   def __getImageTitle(self, title, id, format = "jpg"):
     temp = title.replace('/', '')
-    return "%s_%s.%s" % (temp[:32], id, format)
+#    return "%s_%s.%s" % (temp[:32], id, format)
+    # Store the photos original name. Thus, when pictures are uploaded
+    # their names would remain as it is, allowing easy resumption of
+    # uploading of images, in case some of the photos fail uploading.
+    return "%s.%s" % (temp, format)
 
   def _mkfileWithMeta(self, path, info):
     # Don't retrieve the photo info here.
@@ -432,7 +446,10 @@ class Flickrfs(Fuse):
 #    self.inodeCache[path] = FileInode(path, id)
 
   def getattr(self, path):
-    log.debug("getattr:" + path + ":")
+    # getattr is being called 4-6 times every second for '/'
+    # Don't log those calls, as they clutter up the log file.
+    if path != "/":
+      log.debug("getattr:" + path + ":")
     templist = path.split('/')
     if path.startswith('/sets/'):
       templist[2] = templist[2].split(':')[0]
@@ -758,7 +775,6 @@ class Flickrfs(Fuse):
 
   def parse(self, fname, photoId):
     cp = ConfigParser.ConfigParser()
-#    try:
     log.debug("Parsing file:%s:"%(fname,))
     cp.read(fname)
     log.debug("Read the file for parsing:%s" % fname)
@@ -805,7 +821,8 @@ class Flickrfs(Fuse):
       e.errno = EIO
       raise e
     fname = os.path.join(flickrfsHome, '.'+inode.photoId) #ext
-    if not os.path.exists(fname):
+    # Handle the case when file already exists.
+    if not os.path.exists(fname) or os.path.getsize(fname) == 0L:
       log.info("Retrieving meta information for %s" % fname)
       INFO = self.transfl.getPhotoInfo(inode.photoId)
       size = self.writeMetaInfo(inode.photoId, INFO)
@@ -902,17 +919,31 @@ class Flickrfs(Fuse):
     #Create set if it doesn't exist online (i.e. if id=0)
     if pinode.setId is 0:
       for i in range(0, NUMRETRIES):
-        pinode.setId = self.transfl.createSet(parentPath, inode.photoId)
+        # Retry creation of set if unsuccessful.
+        try:
+          pinode.setId = self.transfl.createSet(parentPath, inode.photoId)
+        except URLError, detail:
+          log.error("handleWriteAddToSet: error while creating set %s: %s" % (parentPath, detail))
+        # If the set is created, then return.
         if pinode.setId is not None:
-          break
+          self.updateInode(parentPath, pinode)
+          return
       if pinode.setId is None:
         log.error("Unable to create set:%s"%(parentPath,))
         e = OSError("Unable to create set.")
         e.errno = EIO
         raise e
-      self.updateInode(parentPath, pinode)
     else:
-      self.transfl.put2Set(pinode.setId, inode.photoId)
+      for i in range(0, NUMRETRIES):
+        try:
+          # If the operation put2Set doesn't throw exception, that means
+          # that the picture has been successfully added to set.
+          # Return in that case, retry otherwise.
+          self.transfl.put2Set(pinode.setId, inode.photoId)
+          return
+        except URLError, detail:
+          log.error("handleWriteAddToSet: error while adding to set: %s" % detail)
+
   #############################
   # End of 'handle' Functions.
   #############################
@@ -998,31 +1029,28 @@ class Flickrfs(Fuse):
   Feel free to set any of the above values to 0, which tells
   the kernel that the info is not available.
     """
-    #Not working properly. Block for time being
-    return
-    log.debug("statfs called")
     block_size = 1024
-    fun_block_size = 1024
-    total_blocks = 0L
+    blocks = 0L
     blocks_free = 0L
-    blocks_free_user = 0L
     files = 0L
     files_free = 0L
-    files_free_user = 0L
-    flag = 0
     namelen = 255
-    (max, used) = self.transfl.getBandwidthInfo()
-    if max!=None:
-      total_blocks = long(int(max)/block_size)
-      blocks_free = long( ( int(max)-int(used) )/block_size)
-      blocks_free_user = blocks_free
+    # statfs is being called repeatedly at least once a second.
+    # The bandwidth information doesn't change that often, so
+    # save upon communication with flickr servers to retrieve this
+    # information. Only retrieve it once in a while.
+    if self.statfsCounter >= 500 or self.statfsCounter is -1:
+      (self.max, self.used) = self.transfl.getBandwidthInfo()
+      self.statfsCounter = 0
+      log.info('statfs: Retrieved Bandwidth info: max %s used %s' % (self.max, self.used))
+    self.statfsCounter = self.statfsCounter + 1
 
-      #files = total_blocks
-      #files_free = blocks_free
-      #files_free_user = blocks_free_user
-      log.debug('total blocks:%s'%(total_blocks))
-      log.debug('blocks_free:%s'%(blocks_free))
-    return (block_size, fun_block_size, total_blocks, blocks_free, blocks_free_user, files, files_free, files_free_user, namelen)
+    if self.max is not None:
+      blocks = long(self.max)/block_size
+      blocks_used = long(self.used)/block_size
+      blocks_free = blocks - blocks_used
+      blocks_available = blocks_free
+      return (block_size, blocks, blocks_free, blocks_available, files, files_free, namelen)
 
   def fsync(self, path, isfsyncfile):
     log.debug("flickrfs.py:Flickrfs:fsync: path=%s, isfsyncfile=%s"%(path,isfsyncfile))

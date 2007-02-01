@@ -20,6 +20,7 @@ import urllib2
 import sys
 import string
 import os
+import time
 
 # flickr auth information
 flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
