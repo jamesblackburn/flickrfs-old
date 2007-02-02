@@ -23,7 +23,8 @@ DEFAULTBLOCKSIZE = 4*1024 # 4 KB
 class Inode(object):
   """Common base class for all file system objects
   """
-  def __init__(self, path=None, id='', mode=None, size=0L, mtime=None, ctime=None):
+  def __init__(self, path=None, id='', mode=None, 
+               size=0L, mtime=None, ctime=None):
     self.nlink = 1
     self.size = size 
     self.id = id
@@ -55,7 +56,8 @@ class DirInode(Inode):
 
 
 class FileInode(Inode):
-  def __init__(self, path=None, id="", mode=None, comm_meta="", size=0L, mtime=None, ctime=None):
+  def __init__(self, path=None, id="", mode=None, comm_meta="", 
+               size=0L, mtime=None, ctime=None):
     if mode is None: mode = 0644
     super(FileInode, self).__init__(path, id, mode, size, mtime, ctime)
     self.mode = S_IFREG | self.mode
@@ -130,4 +132,3 @@ class InodeCache(dict):
 
   def has_key(self, k):
     return k in self.keysCache
-
