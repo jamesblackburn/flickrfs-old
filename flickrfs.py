@@ -92,9 +92,13 @@ def GetResizeStr():
 
 #Utility functions.
 def _log_exception_wrapper(func, *args, **kw):
-    """Call 'func' with args and kws and log any exception it throws.
-    """
-    try: func(*args, **kw)
+  """Call 'func' with args and kws and log any exception it throws.
+  """
+  for i in range(0, NUMRETRIES):
+    log.debug("Retry attempt %s for func %s" % (i, func))
+    try:
+      func(*args, **kw)
+      return
     except:
       log.error("Exception in function %s" % func)
       log.error(format_exc())
@@ -131,6 +135,7 @@ def retryFlickrOp(isNone, func, *args):
   # This function helps in retrying the flickr transactions, in case they fail.
   result = None
   for i in range(0, NUMRETRIES):
+    log.debug("Retry attempt %s for func %s" % (i, func))
     try:
       result = func(*args)
       if result is None:
@@ -244,12 +249,8 @@ class Flickrfs(Fuse):
     return fileSize
 
   def __populate_set(self, set_id, curdir):
-    try:
-      photosInSet = self.transfl.getPhotosFromPhotoset(set_id)
-    except URLError, detail:
-      log.error("Retrieving photos for set %s timed out with error %s" % 
-                (curdir, detail))
-      return
+    # Exception handling will be done by background function.
+    photosInSet = self.transfl.getPhotosFromPhotoset(set_id)
     for b,p in photosInSet.iteritems():
       info = self.transfl.parseInfoFromPhoto(b,p)
       self._mkfileWithMeta(curdir, info)
@@ -305,13 +306,9 @@ class Flickrfs(Fuse):
       self.unlink("%s/%s" % (curdir, c), False)
 
   def __sync_set_in_background(self, set_id, curdir):
+    # Exception handling will be done by background function.
     log.info("Syncing set %s" % curdir)
-    try:
-      psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
-    except URLError, detail:
-      log.error("Sync of set %s timed out with error message: %s" % 
-                (curdir, detail))
-      return
+    psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
     self._sync_code(psetOnline, curdir)
     log.info("Set %s sync successfully finished." % curdir)
     
