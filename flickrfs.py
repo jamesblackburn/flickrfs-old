@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #===============================================================================
 #  flickrfs - Virtual Filesystem for Flickr
 #  Copyright (c) 2005,2006 Manish Rai Jain  <manishrjain@gmail.com>
@@ -49,7 +50,7 @@ else:
 if not os.path.exists(flickrfsHome + "/config.txt"):
   fconfig = open(flickrfsHome+"/config.txt",'w')
   fconfig.write("[configuration]\n")
-  fconfig.write("browser:/usr/bin/firefox\n")
+  fconfig.write("browser:/usr/bin/x-www-browser\n")
   fconfig.write("image.size:\n")
   fconfig.write("sets.sync.int:300\n")
   fconfig.write("stream.sync.int:300\n")
