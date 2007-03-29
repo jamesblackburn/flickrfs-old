@@ -1,5 +1,3 @@
-#!/usr/bin/python
-#
 # Flickr API implementation
 #
 # Inspired largely by Michele Campeotto's flickrclient and Aaron Swartz'
@@ -15,25 +13,45 @@
 # Release 4: better permission support
 # Release 5: converted into fuller-featured "flickrapi"
 # Release 6: fix upload sig bug (thanks Deepak Jois), encode test output
+# Release 7: fix path construction, Manish Rai Jain's improvements, exceptions
+# Release 8: change API endpoint to "api.flickr.com"
+# Release 9: change to MIT license
+# Release 10: fix horrid \r\n bug on final boundary
+# Release 11: break out validateFrob() for subclassing
 #
-# Copyright 2005 Brian "Beej Jorgensen" Hall  beej@beej.us
+# Work by (or inspired by) Manish Rai Jain <manishrjain@gmail.com>:
 #
-#    This work is licensed under the Creative Commons
-#    Attribution License.  To view a copy of this license,
-#    visit http://creativecommons.org/licenses/by/2.5/ or send
-#    a letter to Creative Commons, 543 Howard Street, 5th
-#    Floor, San Francisco, California, 94105, USA.
+#    improved error reporting, proper multipart MIME boundary creation,
+#    use of urllib2 to allow uploads through a proxy, upload accepts
+#    raw data as well as a filename
 #
-# This license says that I must be credited for any derivative works.
-# You do not need to credit me to simply use the FlickrAPI classes in
-# your Python scripts-- you only need to credit me if you're taking this
-# FlickrAPI class and transforming it into your own.
+# Copyright (c) 2007 Brian "Beej Jorgensen" Hall
 #
-# Previous versions of this API were granted to the public domain.
-# You're free to use those as you please.
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
 #
-# Beej Jorgensen, August 2005
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Certain previous versions of this API were granted to the public
+# domain.  You're free to use those as you please.
+#
+# Beej Jorgensen, Maintainer, 19-Jan-2007
 # beej@beej.us
+#
 #------------------------------------------
 # Modified(debugged portions + added functionality) by Manish Rai Jain <manishrjain@gmail.com>
 # If you are interested in finding out exactly
@@ -505,7 +523,7 @@ def main(argv):
 	fapi = FlickrAPI(flickrAPIKey, flickrSecret)
 
 	# do the whole whatever-it-takes to get a valid token:
-	token = fapi.getToken(browser="/opt/firefox/firefox")
+	token = fapi.getToken(browser="/usr/bin/x-www-browser")
 
 	# get my favorites
 	rsp = fapi.favorites_getList(api_key=flickrAPIKey,auth_token=token)
