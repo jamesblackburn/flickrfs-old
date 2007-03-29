@@ -329,9 +329,22 @@ class TransFlickr:
     info = {}
     info['id'] = photo['id']
     info['title'] = photo['title'].replace('/', '_')
-    info['format'] = photo['originalformat']
-    info['dupload'] = photo['dateupload']
-    info['dupdate'] = photo['lastupdate']
+    # Some pics don't contain originalformat attribute, so set it to jpg by default.
+    try:
+      info['format'] = photo['originalformat']
+    except KeyError:
+      info['format'] = 'jpg'
+
+    try:
+      info['dupload'] = photo['dateupload']
+    except KeyError:
+      info['dupload'] = '0'
+
+    try:
+      info['dupdate'] = photo['lastupdate']
+    except KeyError:
+      info['dupdate'] = '0'
+    
     info['perms'] = perms
     return info
 
@@ -347,6 +360,8 @@ class TransFlickr:
 
   def getPhotosFromPhotoset(self, photoset_id):
     photosPermsMap = {}
+    # I'm not utilizing the value part of this dictionary. Its arbitrarily
+    # set to i.
     for i in range(1,6):
       rsp = self.fapi.photosets_getPhotos(auth_token=self.authtoken,
                                           photoset_id=photoset_id, 
