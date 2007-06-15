@@ -68,7 +68,7 @@ import os.path
 import xml.dom.minidom
 import urllib2
 import socket
-DEBUG = 1
+DEBUG = 0
 ########################################################################
 # XML functionality
 ########################################################################
