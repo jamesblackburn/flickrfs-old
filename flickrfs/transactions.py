@@ -362,15 +362,19 @@ class TransFlickr:
     photosPermsMap = {}
     # I'm not utilizing the value part of this dictionary. Its arbitrarily
     # set to i.
-    for i in range(1,6):
+    for i in range(0,3):
       rsp = self.fapi.photosets_getPhotos(auth_token=self.authtoken,
                                           photoset_id=photoset_id, 
                                           extras=self.extras, 
                                           privacy_filter=str(i))
       if not rsp:
         continue
+      if not hasattr(rsp.photoset[0], 'photo'):
+        log.error("Photoset %s Doesn't have attribute photo." % rsp.photoset[0])
+        continue
       for p in rsp.photoset[0].photo:
         photosPermsMap[p] = str(i)
+      break
     return photosPermsMap
             
   def getPhotoStream(self, user_id):
