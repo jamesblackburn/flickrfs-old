@@ -370,7 +370,7 @@ class TransFlickr:
       if not rsp:
         continue
       if not hasattr(rsp.photoset[0], 'photo'):
-        log.error("Photoset %s Doesn't have attribute photo." % rsp.photoset[0])
+        log.error("Photoset %s Doesn't have attribute photo." % rsp.photoset[0]['id'])
         continue
       for p in rsp.photoset[0].photo:
         photosPermsMap[p] = str(i)
