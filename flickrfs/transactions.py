@@ -322,7 +322,10 @@ class TransFlickr:
       log.error("Error getting photoset list: %s" % (rsp.errormsg))
       return []
     if not hasattr(rsp.photosets[0], "photoset"):
+      log.info("No sets found!")
       return []
+    else:
+      log.info("Sets found!")
     return rsp.photosets[0].photoset
 
   def parseInfoFromPhoto(self, photo, perms=None):
