@@ -280,8 +280,11 @@ class Flickrfs(Fuse):
     for b in psetOnline:
       info = self.transfl.parseInfoFromPhoto(b)
       imageTitle = info.get('title','')
-      imageTitle = self.__getImageTitle(imageTitle, 
+      if hasattr(b, 'originalformat'):
+        imageTitle = self.__getImageTitle(imageTitle, 
                                         b['id'], b['originalformat'])
+      else:
+        imageTitle = self.__getImageTitle(imageTitle, b['id'])
       path = "%s/%s"%(curdir, imageTitle)
       inode = self.inodeCache.get(path)
       # This exception throwing is just for debugging.
