@@ -146,6 +146,7 @@ class TransFlickr:
       log.error(rsp.errormsg)
   
   def getPhotoInfo(self, photoId):
+    log.debug("getPhotoInfo")
     rsp = self.fapi.photos_getInfo(auth_token=self.authtoken, photo_id=photoId)
     if not rsp:
       log.error("Can't retrieve information about photo %s, with error %s" % 
@@ -189,6 +190,7 @@ class TransFlickr:
             license, owner, ownerNSID, url, int(posted), int(lastupdate))
 
   def setPerm(self, photoId, mode, comm_meta="33"):
+    log.debug("setPerm")
     public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
     #Set friends and family 4(always), 2(family), 1(friends) 
     friends = mode>>3 & 1
@@ -212,6 +214,7 @@ class TransFlickr:
     return True
 
   def setTags(self, photoId, tags):
+    log.debug("setTags")
     templist = [ '"%s"'%(a,) for a in string.split(tags, ',')] + ['flickrfs']
     tagstring = ' '.join(templist)
     rsp = self.fapi.photos_setTags(auth_token=self.authtoken, 
@@ -223,6 +226,7 @@ class TransFlickr:
     return True
   
   def setMeta(self, photoId, title, desc):
+    log.debug("setMeta")
     rsp = self.fapi.photos_setMeta(auth_token=self.authtoken, 
                                    photo_id=photoId, title=title, 
                                    description=desc)
@@ -233,6 +237,7 @@ class TransFlickr:
     return True
 
   def getLicenses(self):
+    log.debug("getLicenses")
     rsp = self.fapi.photos_licenses_getInfo()
     if not rsp:
       log.error("Couldn't retrieve licenses with error %s" % rsp.errormsg)
@@ -249,6 +254,7 @@ class TransFlickr:
     return sortedLicenseList
     
   def setLicense(self, photoId, license):
+    log.debug("setLicense")
     rsp = self.fapi.photos_licenses_setLicense(auth_token=self.authtoken, 
                                                photo_id=photoId, 
                                                license_id=license)
@@ -259,6 +265,7 @@ class TransFlickr:
     return True
 
   def getPhoto(self, photoId):
+    log.debug("getPhoto")
     rsp = self.fapi.photos_getSizes(auth_token=self.authtoken, 
                                     photo_id=photoId)
     if not rsp:
@@ -281,6 +288,7 @@ class TransFlickr:
     return buf
 
   def removePhotofromSet(self, photoId, photosetId):
+    log.debug("removePhotofromSet")
     rsp = self.fapi.photosets_removePhoto(auth_token=self.authtoken, 
                                           photo_id=photoId, 
                                           photoset_id=photosetId)
@@ -302,6 +310,7 @@ class TransFlickr:
     return (bw['max'], bw['used'])
 
   def getUserId(self):
+    log.debug("getUserId")
     rsp = self.fapi.auth_checkToken(api_key=flickrAPIKey, 
                                     auth_token=self.authtoken)
     if not rsp:
@@ -314,6 +323,7 @@ class TransFlickr:
     return usr['nsid']
 
   def getPhotosetList(self):
+    log.debug("getPhotosetList")
     if self.user_id is "":
       self.getUserId() #This will set the value of self.user_id
     rsp = self.fapi.photosets_getList(auth_token=self.authtoken, 
@@ -362,6 +372,7 @@ class TransFlickr:
     return info
 
   def getPhotosFromPhotoset(self, photoset_id):
+    log.debug("getPhotosFromPhotoset")
     photosPermsMap = {}
     # I'm not utilizing the value part of this dictionary. Its arbitrarily
     # set to i.
@@ -381,6 +392,7 @@ class TransFlickr:
     return photosPermsMap
             
   def getPhotoStream(self, user_id):
+    log.debug("getPhotoStream")
     retList = []
     pageNo = 1
     maxPage = 1
@@ -402,6 +414,7 @@ class TransFlickr:
     return retList
  
   def getTaggedPhotos(self, tags, user_id=None):
+    log.debug("getTaggedPhotos")
     kw = kwdict(auth_token=self.authtoken, tags=tags, tag_mode="all", 
                 extras=self.extras, per_page="500")
     if user_id is not None: 
