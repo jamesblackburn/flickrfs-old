@@ -35,21 +35,14 @@ def cleanup():
     kill(pid, SIGHUP)
     
 testls ="""total 2
---wxr-x--T  1 rdmurray users 1 Feb 10 19:46 IMG_9137.png
--rwxr-xr-x  1 rdmurray users 1 Feb 10 19:46 IMG_9138.png
---wxr-x--T  1 rdmurray users 1 Feb 10 20:50 IMG_9139.png"""
+--wxr-x--T  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9137.png
+-rwxr-xr-x  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9138.png
+--wxr-x--T  1 rdmurray rdmurray 0 Feb 10 20:50 IMG_9139.png"""
 rscls = """total 1
--rwxr-xr-x  1 rdmurray users 1 Feb  2 22:47 Now That's A Radio.jpg
--rwxr-xr-x  1 rdmurray users 1 Feb  2 22:47 Whatever You Want To Hear.jpg"""
+-rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Now That's A Radio.jpg
+-rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Whatever You Want To Hear.jpg"""
 tratls = """total 4
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 Fo da Luciano.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5783.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5784.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 dscn5789.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 il menu memorabile..jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 30 04:47 la gattona grassa da Luciano.jpg
--rwxr-xr-x  1 rdmurray users 1 Feb 17 04:57 lotti che non \xc3\xa8 lotti.jpg
--rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 ride.jpg"""
+-rw-r--r-- 1 rdmurray rdmurray 0 Jan 10 12:40 P\xc5\x93nit\xc3\xa8ntem.jpg"""
 
 extended = False
 if len(argv)>1:
@@ -83,7 +76,7 @@ try:
     mkdir('mnt/tags/personal/flickrfstesttest:flickrfstest')
     mkdir('mnt/stream')
     mkdir('mnt/tags/public/radio:station:college:ca')
-    mkdir('mnt/tags/public/trattoriatoscana')
+    mkdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito')
     sleep(15)
     #The uploaded pic does _not_ appear, and I don't know why.  I suspect it's not a flickerfs bug, but some
     # sort of delay on the flickr side, since the image does show up in our stream.
@@ -99,15 +92,17 @@ try:
     dirlist = listdir('mnt/stream')
     listEQ(listdir('mnt/stream'), ['.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png',
         '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
-    listEQ(listdir('mnt/tags/public/radio:station:college:ca'), [".Now That's A Radio.meta", '.Whatever You Want To Hear.meta',
+    listEQ(listdir('mnt/tags/public/radio:station:college:ca'), [".Now That's A Radio.jpg.meta", '.Whatever You Want To Hear.jpg.meta',
         "Now That's A Radio.jpg", 'Whatever You Want To Hear.jpg'], 'check example public tag set')
     strEQ(cmd('ls -l mnt/tags/public/radio:station:college:ca')[1], rscls, 'ls on example public tag set')
-    listEQ(listdir('mnt/tags/public/trattoriatoscana'), ['Fo da Luciano.jpg', 'dscn5783.jpg',
-        'dscn5784.jpg', 'dscn5789.jpg', 'il menu memorabile..jpg', 'la gattona grassa da Luciano.jpg', 'lotti che non \xc3\xa8 lotti.jpg', 'ride.jpg',
-        '.Fo da Luciano.meta', '.lotti che non \xc3\xa8 lotti.meta', '.dscn5783.meta',
-        '.dscn5784.meta', '.dscn5789.meta', '.il menu memorabile..meta', '.la gattona grassa da Luciano.meta', '.ride.meta'],
-        'public tag set with international characters')
-    strEQ(cmd('ls -l mnt/tags/public/trattoriatoscana')[1], tratls, 'ls on international char public tag set')
+    listEQ(listdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito'),
+        ['.P\xc5\x93nit\xc3\xa8ntem.jpg.meta', 'P\xc5\x93nit\xc3\xa8ntem.jpg'],
+        'publig tag set with international characters')
+    strEQ(
+        cmd(('ls -l '
+            'mnt/tags/public/mortificazioniafflittivedisensoedispirito'))[1],
+        tratls,
+        'ls on international char public tag set')
     if extended:
         system('fusermount -u ./mnt')
         sleep(2)
