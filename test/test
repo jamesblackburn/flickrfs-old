@@ -7,6 +7,9 @@ from os.path import exists
 from signal import SIGHUP
 from time import sleep
 from commands import getstatusoutput as cmd
+from traceback import format_exc
+
+initialsleep = 20
 
 def error(expected, got):
     print "Error!  Expected:"
@@ -28,7 +31,7 @@ def strEQ(a, b, tag=None):
 def cleanup():
     chdir(environ['HOME'])
     if testset: system('rm -r mnt/sets/test')
-    system('fusermount -u ./mnt')
+    if pid!=0: system('fusermount -u ./mnt')
     kill(pid, SIGHUP)
     
 testls ="""total 2
@@ -48,16 +51,18 @@ tratls = """total 4
 -rwxr-xr-x  1 rdmurray users 1 Feb 17 04:57 lotti che non \xc3\xa8 lotti.jpg
 -rwxr-xr-x  1 rdmurray users 1 Jan 17 07:35 ride.jpg"""
 
-if len(argv)>1 and argv[1]=='extended': extended = True
-else: extended = False
+extended = False
+if len(argv)>1:
+    if argv[1]=='extended': extended = True
+    elif argv[1].isdigit(): initialsleep = int(argv[1])
 
 try:
     testset = False
     environ['HOME'] = getcwd()
     if not exists('mnt'): mkdir('mnt')
     pid = fork()
-    if not pid: execl('../flickrfs.py','../flickrfs.py', './mnt')
-    sleep(20)
+    if not pid: execl('../flickrfs/flickrfs.py','../flickrfs.py', './mnt')
+    sleep(initialsleep)
     listEQ(listdir('mnt'), ['sets', 'tags'], 'check that base dirs exist')
     listEQ(listdir('mnt/sets'), ['flickrfstesttest'], 'check that existing test set shows up in sets')
     listEQ(listdir('mnt/sets/flickrfstesttest'), [ '.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta',
@@ -121,6 +126,7 @@ try:
     
 
 except:
+    if pid==0: print format_exc()
     cleanup()
     raise
 
