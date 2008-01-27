@@ -61,3 +61,5 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
             copy of the extenion name tacked on.
       - bugfix: fixed inability to retrieve certain photos.
       - bugfix: added missing import of 'sys' module (only used during certain error exits)
+      - 20080127RDM bugfix: added fuse-python 0.2 compatibility by setting the
+          python_fuse_api to 0.1.

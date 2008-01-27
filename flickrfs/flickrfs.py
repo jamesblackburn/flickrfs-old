@@ -20,7 +20,13 @@ import time, logging, logging.handlers, os, sys
 from glob import glob
 from errno import *
 from traceback import format_exc
-from fuse import Fuse
+# The python-fuse api has changed in 0.2, but we're still using the 0.1 api.
+# The following two lines line will make us compatible with both versions by
+# making 2.0 use the 1.0 api.
+# (See http://fuse4bsd.creo.hu/README.new_fusepy_api.html)
+import fuse
+fuse.fuse_python_api = (0, 1)
+Fuse = fuse.Fuse
 import threading
 import random, commands
 from urllib2 import URLError
