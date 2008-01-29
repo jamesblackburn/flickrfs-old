@@ -67,4 +67,6 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
           rather than one thread per set.  This seems to fix the problem of
           having no photos appear when there are lots of sets.
       - 20080128RDM bugfix: handle the case of the photo not having an
-          'originalformat' property in getPhotoInfo (default to jpg).
+           'originalformat' property in getPhotoInfo (default to jpg).
+      - 20080129RDM bigfix: removed limit of 500 images per directory
+           in the 'sets' directory.  Bug still exists for other directories.
