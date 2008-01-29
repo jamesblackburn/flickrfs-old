@@ -152,7 +152,9 @@ class TransFlickr:
       log.error("Can't retrieve information about photo %s, with error %s" % 
                 (photoId, rsp.errormsg))
       return None
-    format = rsp.photo[0]['originalformat']
+    #XXX: should see if there's some other 'format' option we can fall back to.
+    try: format = rsp.photo[0]['originalformat']
+    except KeyError: format = 'jpg'
     perm_public = rsp.photo[0].visibility[0]['ispublic']
     perm_family = rsp.photo[0].visibility[0]['isfamily']
     perm_friend = rsp.photo[0].visibility[0]['isfriend']
