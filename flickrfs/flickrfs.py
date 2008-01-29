@@ -279,7 +279,7 @@ class Flickrfs(Fuse):
         curdir = "/sets/" + a['id']
       set_id = a['id']
       self._mkdir(curdir, id=set_id)
-      background(self.__populate_set, set_id, curdir)
+      self.__populate_set(set_id, curdir)
 
   def _sync_code(self, psetOnline, curdir):
     psetLocal = set(map(lambda x: x[0], self.getdir(curdir, False)))
