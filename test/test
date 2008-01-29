@@ -3,7 +3,7 @@
 
 from sys import argv
 from os import environ, system, fork, execl, kill, getcwd, chdir, listdir, mkdir
-from os.path import exists
+from os.path import exists, isfile
 from signal import SIGHUP
 from time import sleep
 from commands import getstatusoutput as cmd
@@ -34,14 +34,14 @@ def cleanup():
     if pid!=0: system('fusermount -u ./mnt')
     kill(pid, SIGHUP)
     
-testls ="""total 2
+testls ="""total 0
 --wxr-x--T  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9137.png
 -rwxr-xr-x  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9138.png
 --wxr-x--T  1 rdmurray rdmurray 0 Feb 10 20:50 IMG_9139.png"""
-rscls = """total 1
+rscls = """total 0
 -rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Now That's A Radio.jpg
 -rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Whatever You Want To Hear.jpg"""
-tratls = """total 4
+tratls = """total 0
 -rw-r--r-- 1 rdmurray rdmurray 0 Jan 10 12:40 P\xc5\x93nit\xc3\xa8ntem.jpg"""
 
 extended = False
@@ -55,9 +55,20 @@ try:
     if not exists('mnt'): mkdir('mnt')
     pid = fork()
     if not pid: execl('../flickrfs/flickrfs.py','../flickrfs.py', './mnt')
-    sleep(initialsleep)
+    for i in range(10000):
+        if listdir('mnt'): break
+        sleep(0.01)
+    else: print "timeout before mnt became non-empty"
     listEQ(listdir('mnt'), ['sets', 'tags'], 'check that base dirs exist')
+    for i in range(10000):
+        if listdir('mnt/sets'): break
+        sleep(0.01)
+    else: print "timeout before sets became non-empty"
     listEQ(listdir('mnt/sets'), ['flickrfstesttest'], 'check that existing test set shows up in sets')
+    for i in range(10000):
+        if listdir('mnt/sets/flickrfstesttest'): break
+        sleep(0.01)
+    else: print "timeout before flickrfstesttest became non-empty"
     listEQ(listdir('mnt/sets/flickrfstesttest'), [ '.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta',
         'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png'], 'check existing image set contents')
     strEQ(cmd('ls -l mnt/sets/flickrfstesttest')[1], testls, 'ls on existing set')
@@ -73,11 +84,30 @@ try:
     listEQ(listdir('mnt/tags/public'), [], 'initially no public dirs')
     listEQ(listdir('mnt/tags/personal'), [], 'initially no personal dirs')
     mkdir('mnt/tags/personal/flickrfstesttest')
+    for i in range(1000):
+        if listdir('mnt/tags/personal/flickrfstesttest'): break
+        sleep(0.01)
+    else: print "timeout before flickrfstesttest directory became non-empty"
     mkdir('mnt/tags/personal/flickrfstesttest:flickrfstest')
+    for i in range(1000):
+        if listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'): break
+        sleep(0.01)
+    else: print "timeout before flickrfstesttest:flickrfstest directory became non-empty"
     mkdir('mnt/stream')
+    for i in range(1000):
+        if listdir('mnt/stream'): break
+        sleep(0.01)
+    else: print "timeout before stream directory became non-empty"
     mkdir('mnt/tags/public/radio:station:college:ca')
+    for i in range(1000):
+        if listdir('mnt/tags/public/radio:station:college:ca'): break
+        sleep(0.01)
+    else: print "timeout before college tag directory became non-empty"
     mkdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito')
-    sleep(15)
+    for i in range(1000):
+        if listdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito'): break
+        sleep(0.01)
+    else: print "timeout before international tag directory became non-empty"
     #The uploaded pic does _not_ appear, and I don't know why.  I suspect it's not a flickerfs bug, but some
     # sort of delay on the flickr side, since the image does show up in our stream.
     # 20060214: the pic is appearing now, and I don't know what changed.
