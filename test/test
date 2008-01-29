@@ -127,7 +127,7 @@ try:
     strEQ(cmd('ls -l mnt/tags/public/radio:station:college:ca')[1], rscls, 'ls on example public tag set')
     listEQ(listdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito'),
         ['.P\xc5\x93nit\xc3\xa8ntem.jpg.meta', 'P\xc5\x93nit\xc3\xa8ntem.jpg'],
-        'publig tag set with international characters')
+        'public tag set with international characters')
     strEQ(
         cmd(('ls -l '
             'mnt/tags/public/mortificazioniafflittivedisensoedispirito'))[1],
