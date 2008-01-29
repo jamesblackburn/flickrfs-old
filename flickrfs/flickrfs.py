@@ -346,7 +346,7 @@ class Flickrfs(Fuse):
       if title.strip()=='':
         curdir = "/sets/" + a['id']
       set_id = a['id']
-      background(self.__sync_set_in_background, set_id, curdir)
+      self.__sync_set_in_background(set_id, curdir)
     log.info('sync_sets_thread finished')
 
   def sync_stream_thread(self):
