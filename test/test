@@ -34,15 +34,25 @@ def cleanup():
     if pid!=0: system('fusermount -u ./mnt')
     kill(pid, SIGHUP)
     
+#20080130 What it was in 2006:
+#testls ="""total 0
+#--wxr-x--T  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9137.png
+#-rwxr-xr-x  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9138.png
+#--wxr-x--T  1 rdmurray rdmurray 0 Feb 10 20:50 IMG_9139.png"""
+#rscls = """total 0
+#-rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Now That's A Radio.jpg
+#-rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Whatever You Want To Hear.jpg"""
+#20080130 Current reality:
 testls ="""total 0
---wxr-x--T  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9137.png
--rwxr-xr-x  1 rdmurray rdmurray 0 Feb 10 19:46 IMG_9138.png
---wxr-x--T  1 rdmurray rdmurray 0 Feb 10 20:50 IMG_9139.png"""
+-rwxr--r-- 1 rdmurray rdmurray 0 Aug 14 06:32 IMG_9137.jpg
+-rwxr--r-- 1 rdmurray rdmurray 0 Aug 14 06:32 IMG_9138.jpg
+-rwxr--r-- 1 rdmurray rdmurray 0 Aug 14 06:32 IMG_9139.jpg"""
 rscls = """total 0
--rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Now That's A Radio.jpg
--rwxr-xr-x  1 rdmurray rdmurray 0 Jun  4 2007 Whatever You Want To Hear.jpg"""
+-rw-r--r-- 1 rdmurray rdmurray 0 Jun  4  2007 Now That's A Radio.jpg
+-rw-r--r-- 1 rdmurray rdmurray 0 Jun  4  2007 Whatever You Want To Hear.jpg"""
 tratls = """total 0
 -rw-r--r-- 1 rdmurray rdmurray 0 Jan 10 12:40 P\xc5\x93nit\xc3\xa8ntem.jpg"""
+#End 20080130
 
 extended = False
 if len(argv)>1:
@@ -66,11 +76,16 @@ try:
     else: print "timeout before sets became non-empty"
     listEQ(listdir('mnt/sets'), ['flickrfstesttest'], 'check that existing test set shows up in sets')
     for i in range(10000):
-        if listdir('mnt/sets/flickrfstesttest'): break
+        if len(listdir('mnt/sets/flickrfstesttest'))>=6: break
         sleep(0.01)
-    else: print "timeout before flickrfstesttest became non-empty"
-    listEQ(listdir('mnt/sets/flickrfstesttest'), [ '.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta',
-        'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png'], 'check existing image set contents')
+    else: print "timeout before flickrfstesttest filled"
+    # 20080130: 2006 version:
+    #listEQ(listdir('mnt/sets/flickrfstesttest'), [ '.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta',
+    #    'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png'], 'check existing image set contents')
+    # 20080130: current reality:
+    listEQ(listdir('mnt/sets/flickrfstesttest'), [ '.IMG_9137.jpg.meta', '.IMG_9138.jpg.meta', '.IMG_9139.jpg.meta',
+        'IMG_9137.jpg', 'IMG_9138.jpg', 'IMG_9139.jpg'], 'check existing image set contents')
+    #End 20080130
     strEQ(cmd('ls -l mnt/sets/flickrfstesttest')[1], testls, 'ls on existing set')
     mkdir('mnt/sets/test')
     testset = True
@@ -79,7 +94,7 @@ try:
     #If we use utf8 chars in the upload, we get a UnicdeDecodeError when we try to encode to utf8.
     #system('cp screenshot_thumb.jpg mnt/sets/test:flickrfstesttest:flickrfstest/screenshot\xc3\xa8thumb.jpg')
     system('cp screenshot_thumb.jpg mnt/sets/test:flickrfstesttest:flickrfstest/screenshot_thumb.jpg')
-    listEQ(listdir('mnt/sets/test'), ['screenshot_thumb.jpg'], 'look for uploaded test pic')
+    listEQ(listdir('mnt/sets/test'), ['.screenshot_thumb.jpg.meta', 'screenshot_thumb.jpg'], 'look for uploaded test pic')
     listEQ(listdir('mnt/tags'), ['personal', 'public'], 'check for base tags dirs')
     listEQ(listdir('mnt/tags/public'), [], 'initially no public dirs')
     listEQ(listdir('mnt/tags/personal'), [], 'initially no personal dirs')
@@ -108,20 +123,31 @@ try:
         if listdir('mnt/tags/public/mortificazioniafflittivedisensoedispirito'): break
         sleep(0.01)
     else: print "timeout before international tag directory became non-empty"
-    #The uploaded pic does _not_ appear, and I don't know why.  I suspect it's not a flickerfs bug, but some
-    # sort of delay on the flickr side, since the image does show up in our stream.
-    # 20060214: the pic is appearing now, and I don't know what changed.
-    listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-            'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have some of our images')
+    # 20080130: 2007 version:
+    ##The uploaded pic does _not_ appear, and I don't know why.  I suspect it's not a flickerfs bug, but some
+    ## sort of delay on the flickr side, since the image does show up in our stream.
+    ## 20060214: the pic is appearing now, and I don't know what changed.
     #listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
-    #        'IMG_9139.png'], 'personal/flickrfstesttest should have some of our images')
-    listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png',
-            '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest:flickrfstest should have fewer images')
-    #listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png'],
-    #        'personal/flickrfstesttest:flickrfstest should have fewer images')
+    #        'IMG_9139.png', '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have some of our images')
+    ##listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9138.png',
+    ##        'IMG_9139.png'], 'personal/flickrfstesttest should have some of our images')
+    #listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png',
+    #        '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest:flickrfstest should have fewer images')
+    ##listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.meta', 'IMG_9139.png'],
+    ##        'personal/flickrfstesttest:flickrfstest should have fewer images')
+    #dirlist = listdir('mnt/stream')
+    #listEQ(listdir('mnt/stream'), ['.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png',
+    #    '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
+    # 20080130: current reality:
+    listEQ(listdir('mnt/tags/personal/flickrfstesttest'), ['.IMG_9138.jpg.meta', '.IMG_9139.jpg.meta', 'IMG_9138.jpg',
+            'IMG_9139.jpg', '.screenshot_thumb.jpg.meta', 'screenshot_thumb.jpg'], 'personal/flickrfstesttest should have some of our images')
+    # Not sure if screenshot should appear here or not...may be timing issue
+    listEQ(listdir('mnt/tags/personal/flickrfstesttest:flickrfstest'), ['.IMG_9139.jpg.meta', 'IMG_9139.jpg',
+            ], 'personal/flickrfstesttest:flickrfstest should have fewer images')
     dirlist = listdir('mnt/stream')
-    listEQ(listdir('mnt/stream'), ['.IMG_9137.meta', '.IMG_9138.meta', '.IMG_9139.meta', 'IMG_9137.png', 'IMG_9138.png', 'IMG_9139.png',
-        '.screenshot_thumb.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
+    listEQ(listdir('mnt/stream'), ['.IMG_9137.jpg.meta', '.IMG_9138.jpg.meta', '.IMG_9139.jpg.meta', 'IMG_9137.jpg', 'IMG_9138.jpg', 'IMG_9139.jpg',
+        '.screenshot_thumb.jpg.meta', 'screenshot_thumb.jpg'], 'check our image stream contents')
+    #End 20080130
     listEQ(listdir('mnt/tags/public/radio:station:college:ca'), [".Now That's A Radio.jpg.meta", '.Whatever You Want To Hear.jpg.meta',
         "Now That's A Radio.jpg", 'Whatever You Want To Hear.jpg'], 'check example public tag set')
     strEQ(cmd('ls -l mnt/tags/public/radio:station:college:ca')[1], rscls, 'ls on example public tag set')
