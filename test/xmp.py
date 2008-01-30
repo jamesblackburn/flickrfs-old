@@ -20,9 +20,6 @@ except ImportError:
 import fuse
 from fuse import Fuse
 
-print fuse.__file__
-print fuse.__version__
-
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
