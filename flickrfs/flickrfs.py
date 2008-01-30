@@ -35,6 +35,14 @@ import inodes
 
 #Some global definitions and functions
 NUMRETRIES = 3
+DEFAULTCONFIG = """\
+[configuration]
+
+browser: /usr/bin/x-www-browser
+image.size:
+sets.sync.int: 300
+stream.sync.int: 300
+"""
 
 #Set up the .flickfs directory.
 homedir = os.getenv('HOME')
@@ -55,11 +63,7 @@ else:
 # Added by Varun Hiremath
 if not os.path.exists(flickrfsHome + "/config.txt"):
   fconfig = open(flickrfsHome+"/config.txt",'w')
-  fconfig.write("[configuration]\n")
-  fconfig.write("browser:/usr/bin/x-www-browser\n")
-  fconfig.write("image.size:\n")
-  fconfig.write("sets.sync.int:300\n")
-  fconfig.write("stream.sync.int:300\n")
+  fconfig.write(DEFAULTCONFIG)
   fconfig.close()
 
 # Set up logging
