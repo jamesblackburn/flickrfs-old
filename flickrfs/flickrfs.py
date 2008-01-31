@@ -67,13 +67,16 @@ if not os.path.exists(flickrfsHome + "/config.txt"):
   fconfig.close()
 
 # Set up logging
-log = logging.getLogger('flickrfs')
+rootlogger = logging.getLogger()
 loghdlr = logging.handlers.RotatingFileHandler(
                              os.path.join(flickrfsHome,'log'), "a", 5242880, 3)
-logfmt = logging.Formatter("%(asctime)s %(levelname)-10s %(message)s", "%x %X")
+logfmt = logging.Formatter("%(asctime)s %(name)-14s %(levelname)-7s %(threadName)-10s %(funcName)-22s %(message)s", "%x %X")
 loghdlr.setFormatter(logfmt)
-log.addHandler(loghdlr)
-log.setLevel(logging.DEBUG)
+rootlogger.addHandler(loghdlr)
+rootlogger.setLevel(logging.DEBUG)
+log = logging.getLogger('flickrfs')
+logattr = logging.getLogger('flickrfs.attr')
+logattr.setLevel(logging.INFO)
 
 cp = ConfigParser.ConfigParser()
 cp.read(flickrfsHome + '/config.txt')
@@ -106,12 +109,12 @@ def _log_exception_wrapper(func, *args, **kw):
   """Call 'func' with args and kws and log any exception it throws.
   """
   for i in range(0, NUMRETRIES):
-    log.debug("Retry attempt %s for func %s" % (i, func))
+    log.debug("retry attempt %s for func %s", i, func.__name__)
     try:
       func(*args, **kw)
       return
     except:
-      log.error("Exception in function %s" % func)
+      log.error("exception in function %s", func.__name__)
       log.error(format_exc())
 
 def background(func, *args, **kw):
@@ -132,21 +135,26 @@ def background(func, *args, **kw):
 def timerThread(func, func1, interval):
   '''Execute func now, followed by func1 every interval seconds
   '''
+  log.debug("running first pass funtion %s", func.__name__)
   t = threading.Timer(0.0, func)
   try:
     t.run()
-  except: pass
+  except: 
+    log.debug(format_exc())
   while(interval):
+    log.debug("scheduling function %s to run in %s seconds",
+        func1.__name__, interval)
     t = threading.Timer(interval, func1)
     try:
       t.run()
-    except: pass
+    except:
+      log.debug(format_exc())
 
 def retryFlickrOp(isNone, func, *args):
   # This function helps in retrying the flickr transactions, in case they fail.
   result = None
   for i in range(0, NUMRETRIES):
-    log.debug("Retry attempt %s for func %s" % (i, func))
+    log.debug("retry attempt %d for func %s", i, func.__name__)
     try:
       result = func(*args)
       if result is None:
@@ -157,7 +165,8 @@ def retryFlickrOp(isNone, func, *args):
       else:
         return result
     except URLError, detail:
-      log.error("Failure in function %s with error: %s" % (func, detail))
+      log.error("URLError in function %s with error: %s",
+          func.__name__, detail)
   # We've utilized all our attempts, send out the result whatever it is.
   return result
 
@@ -166,14 +175,15 @@ class Flickrfs(Fuse):
   def __init__(self, *args, **kw):
   
     Fuse.__init__(self, *args, **kw)
-    log.info("flickrfs.py:Flickrfs:mountpoint: %s" % repr(self.mountpoint))
-    log.info("flickrfs.py:Flickrfs:unnamed mount options: %s" % self.optlist)
-    log.info("flickrfs.py:Flickrfs:named mount options: %s" % self.optdict)
+    log.info("mountpoint: %s", repr(self.mountpoint))
+    log.info("mount options: %s", ', '.join(self.optlist))
+    log.info("named mount options: %s",
+        ', '.join([ "%s: %s" % (k, v) for k, v in self.optdict.items() ]))
     
     self.inodeCache = inodes.InodeCache(dbPath) # Inodes need to be stored.
     self.imgCache = inodes.ImageCache()
     self.NSID = ""
-    self.transfl = TransFlickr(log, browserName)
+    self.transfl = TransFlickr(browserName)
 
     # Set some variables to be utilized by statfs function.
     self.statfsCounter = -1
@@ -182,13 +192,13 @@ class Flickrfs(Fuse):
 
     self.NSID = self.transfl.getUserId()
     if self.NSID is None:
-      log.error("Initialization:Can't retrieve user information")
+      log.error("can't retrieve user information")
       sys.exit(-1)
 
-    log.info('Getting list of licenses available')
+    log.info('getting list of licenses available')
     self.licenses = self.transfl.getLicenses()
     if self.licenses is None:
-      log.error("Initialization:Can't retrieve license information")
+      log.error("can't retrieve license information")
       sys.exit(-1)
 
     # do stuff to set up your filesystem here, if you want
@@ -212,24 +222,26 @@ class Flickrfs(Fuse):
     f.close()
     cmd = 'identify -format "%%w" %s'%(im,)
     status,ret = commands.getstatusoutput(cmd)
+    msg = ("%s command not found; you must install Imagemagick to get "
+      "auto photo resizing")
     if status!=0:
-      print "identify command not found. Install Imagemagick"
-      log.error("identify command not found. Install Imagemagick")
+      print msg % 'identify'
+      log.error(msg, identify)
       return bufData
     try:
       if int(ret)<int(GetResizeStr().split('x')[0]):
-        log.info('Image size is smaller than specified in config.txt.'
-                 ' Taking original size')
+        log.info('image size is smaller than size specified in config.txt;'
+                 ' retaining original size')
         return bufData
     except:
-      log.error('Invalid format of image.size in config.txt')
+      log.error('invalid format of image.size in config.txt')
       return bufData
-    log.debug("Resizing image %s to size %s" % (im, GetResizeStr()))
+    log.debug("resizing image %s to size %s" % (im, GetResizeStr()))
     cmd = 'convert %s -resize %s %s-conv'%(im, GetResizeStr(), im)
     ret = os.system(cmd)
     if ret!=0:
-      print "convert Command not found. Install Imagemagick"
-      log.error("convert Command not found. Install Imagemagick")  
+      print msg % 'convert'
+      log.error(msg, 'convert')
       return bufData
     else:
       f = open(im + '-conv')
@@ -265,7 +277,7 @@ class Flickrfs(Fuse):
     for b,p in photosInSet.iteritems():
       info = self.transfl.parseInfoFromPhoto(b,p)
       self._mkfileWithMeta(curdir, info)
-    log.info("Set %s populated." % curdir)
+    log.info("set %s populated, photo count %s", curdir, len(photosInSet))
 
   def sets_thread(self):
     """
@@ -273,11 +285,11 @@ class Flickrfs(Fuse):
       python interpreter running in foreground, you can have threads
     """
     print "Sets are being populated in the background."
-    log.info("sets_thread: started")
+    log.info("started")
     self._mkdir("/sets")
     for a in self.transfl.getPhotosetList():
       title = a.title[0].elementText.replace('/', '_')
-      log.info("Populating set %s." % title)
+      log.info("populating set %s", title)
       curdir = "/sets/" + title
       if title.strip()=='':
         curdir = "/sets/" + a['id']
@@ -303,11 +315,11 @@ class Flickrfs(Fuse):
         e.errno = ENOENT
         raise e
       if inode == None: # Image inode not present in the set.
-        log.debug("New image found: %s"%(path))
+        log.debug("new image found: %s", path)
         self._mkfileWithMeta(curdir, info)
       else:
         if inode.mtime != int(info.get('dupdate')):
-          log.debug("Image %s changed"%(path))
+          log.debug("image %s changed", path)
           self.inodeCache.pop(path)
           if self.inodeCache.has_key(path + ".meta"):
             self.inodeCache.pop(path + ".meta")
@@ -316,18 +328,18 @@ class Flickrfs(Fuse):
     if len(psetLocal)>0:
       log.info('%s photos have been deleted online' % len(psetLocal))
     for c in psetLocal:
-      log.info('deleting:%s' % c)
+      log.info('deleting %s', c)
       self.unlink("%s/%s" % (curdir, c), False)
 
   def __sync_set_in_background(self, set_id, curdir):
     # Exception handling will be done by background function.
-    log.info("Syncing set %s" % curdir)
+    log.info("syncing set %s", curdir)
     psetOnline = self.transfl.getPhotosFromPhotoset(set_id)
     self._sync_code(psetOnline, curdir)
-    log.info("Set %s sync successfully finished." % curdir)
+    log.info("set %s sync successfully finished", curdir)
     
   def sync_sets_thread(self):
-    log.info("sync_sets_thread: started")
+    log.info("started")
     setListOnline = self.transfl.getPhotosetList()
     setListLocal = self.getdir('/sets', False)
     
@@ -336,12 +348,12 @@ class Flickrfs(Fuse):
       if title.strip()=="":
         title = a['id']
       if (title,0) not in setListLocal: #New set added online
-        log.info("%s set has been added online."%(title,))
+        log.info("new set %s found online", title)
         self._mkdir('/sets/'+title, a['id'])
       else: #Present Online
         setListLocal.remove((title,0))
     for a in setListLocal: #List of sets present locally, but not online
-      log.info('Recursively deleting set %s'%(a,))
+      log.info('set %s no longer online, recursively deleting it', a)
       self.rmdir('/sets/'+a[0], online=False, recr=True)
         
     for a in setListOnline:
@@ -351,30 +363,30 @@ class Flickrfs(Fuse):
         curdir = "/sets/" + a['id']
       set_id = a['id']
       self.__sync_set_in_background(set_id, curdir)
-    log.info('sync_sets_thread finished')
+    log.info('finished')
 
   def sync_stream_thread(self):
-    log.info('sync_stream_thread started')
+    log.info('started')
     psetOnline = self.transfl.getPhotoStream(self.NSID)
     self._sync_code(psetOnline, '/stream')
-    log.info('sync_stream_thread finished')
+    log.info('finished')
       
   def stream_thread(self):
-    log.info("stream_thread started")
+    log.info("started")
     print "Populating photostream"
     for b in self.transfl.getPhotoStream(self.NSID):
       info = self.transfl.parseInfoFromPhoto(b)
       self._mkfileWithMeta('/stream', info)
-    log.info("stream_thread finished")
+    log.info("finished")
     print "Photostream population finished."
       
   def tags_thread(self, path):
     ind = string.rindex(path, '/')
     tagName = path[ind+1:]
     if tagName.strip()=='':
-      log.error("The tagName:%s: doesn't contain any tags"%(tagName))
+      log.error("the tagName '%s' doesn't contain any tags", tagName)
       return 
-    log.info("tags_thread:" + tagName + ":started")
+    log.info("started for %s", tagName)
     sendtagList = ','.join(tagName.split(':'))
     if(path.startswith('/tags/personal')):
       user_id = self.NSID
@@ -440,26 +452,26 @@ class Flickrfs(Fuse):
     parentDir, name = os.path.split(path)
     if parentDir=='':
       parentDir = '/'
-    log.debug("parentDir:" + parentDir + ":")
+    log.debug("parentDir %s", parentDir)
     return path, id, parentDir, name
 
   def _mkdir(self, path, id="", mtime=None, ctime=None):
     path, id, parentDir, name = self._parsepathid(path, id)
-    log.debug("Creating directory:" + path)
+    log.debug("creating directory %s", path)
     self.inodeCache[path] = inodes.DirInode(path, id, mtime=mtime, ctime=ctime)
     if path!='/':
       pinode = self.getInode(parentDir)
       pinode.nlink += 1
       self.updateInode(parentDir, pinode)
-      log.debug("nlink of %s is now %s" % (parentDir, pinode.nlink))
+      log.debug("nlink of %s is now %s", parentDir, pinode.nlink)
 
   def _mkfile(self, path, id="", mode=None, 
               comm_meta="", mtime=None, ctime=None):
     path, id, parentDir, name = self._parsepathid(path, id)
-    log.debug("Creating file:" + path + ":with id:" + id)
+    log.debug("creating file %s with id %s", path, id)
     image_name, extension = os.path.splitext(name)
     if not extension:
-      log.error("Can't create file without extension")
+      log.error("can't create file without extension")
       return
     fInode = inodes.FileInode(path, id, mode=mode, comm_meta=comm_meta,
                               mtime=mtime, ctime=ctime)
@@ -477,7 +489,7 @@ class Flickrfs(Fuse):
     # getattr is being called 4-6 times every second for '/'
     # Don't log those calls, as they clutter up the log file.
     if path != "/":
-      log.debug("getattr:" + path + ":")
+      logattr.debug("getattr: %s", path)
     templist = path.split('/')
     if path.startswith('/sets/'):
       templist[2] = templist[2].split(':')[0]
@@ -487,10 +499,10 @@ class Flickrfs(Fuse):
 
     inode=self.getInode(path)
     if inode:
-      #log.debug("inode "+str(inode))
+      #log.debug("inode %s", inode)
       statTuple = (inode.mode,inode.ino,inode.dev,inode.nlink,
           inode.uid,inode.gid,inode.size,inode.atime,inode.mtime,inode.ctime)
-      #log.debug("statsTuple "+str(statTuple))
+      #log.debug("statsTuple %s", statTuple)
       return statTuple
     else:
       e = OSError("No such file"+path)
@@ -502,7 +514,7 @@ class Flickrfs(Fuse):
     return os.readlink(path)
   
   def getdir(self, path, hidden=True):
-    log.debug("getdir:" + path)
+    logattr.debug("getdir: %s", path)
     templist = []
     if hidden:
       templist = ['.', '..']
@@ -521,7 +533,7 @@ class Flickrfs(Fuse):
     return map(lambda x: (x,0), templist)
 
   def unlink(self, path, online=True):
-    log.debug("unlink:%s:" % (path))
+    log.debug("unlink %s", path)
     if self.inodeCache.has_key(path):
       inode = self.inodeCache.pop(path)
       # Remove the meta data file as well if it exists
@@ -530,7 +542,7 @@ class Flickrfs(Fuse):
 
       typesinfo = mimetypes.guess_type(path)
       if typesinfo[0] is None or typesinfo[0].count('image')<=0:
-        log.debug("unlinked a non-image file:%s:"%(path,))
+        log.debug("unlinked non-image file %s", path)
         return
 
       if path.startswith('/sets/'):
@@ -540,16 +552,16 @@ class Flickrfs(Fuse):
         if online:
           self.transfl.removePhotofromSet(photoId=inode.photoId, 
                                           photosetId=pinode.setId)
-          log.info("Photo %s removed from set"%(path,))
+          log.info("photo %s removed from set", path)
       del inode
     else:
-      log.error("Can't find what you want to remove")
+      log.error("%s is not a known file", path)
       #Dont' raise an exception. Not useful when
       #using editors like Vim. They make loads of 
       #crap buffer files
   
   def rmdir(self, path, online=True, recr=False):
-    log.debug("rmdir:%s:"%(path))
+    log.debug("removing %s", path)
     if self.inodeCache.has_key(path):
       for a in self.inodeCache.keys():
         if a.startswith(path+'/'):
@@ -560,15 +572,15 @@ class Flickrfs(Fuse):
             e.errno = ENOTEMPTY
             raise e
     else:
-      log.error("Can't find the directory you want to remove")
+      log.error("%s is not a known directory", path)
       e = OSError("No such folder"+path)
       e.errno = ENOENT
       raise e
       
     if path=='/sets' or path=='/tags' or path=='/tags/personal' \
         or path=='/tags/public' or path=='/stream':
-      log.debug("rmdir on the framework! I refuse to do anything! <Stubborn>")
-      e = OSError("Removal of folder %s not allowed" % (path))
+      log.debug("attempt to remove framework file %s rejected", path)
+      e = OSError("removal of folder %s not allowed" % (path))
       e.errno = EPERM
       raise e
 
@@ -587,18 +599,18 @@ class Flickrfs(Fuse):
     return os.symlink(path, path1)
 
   def rename(self, path, path1):
-    log.debug("rename:path:%s:to path1:%s:"%(path,path1))
+    log.debug("%s %s", path, path1)
     #Donot allow Vim to create a file~
     #Check for .meta in both paths
     if path.count('~')>0 or path1.count('~')>0:
-      log.debug("This seems Vim working")
+      log.debug("vim enablement path entered")
       try:
         #Get inode, but _dont_ remove from cache
         inode = self.getInode(path)
         if inode is not None:
           self.inodeCache[path1] = inode
       except:
-        log.debug("Couldn't find inode for:%s:"%(path,))
+        log.debug("couldn't find inode for %s", path)
       return
 
     #Read from path
@@ -625,7 +637,7 @@ class Flickrfs(Fuse):
       log.error(retinfo)
     
   def link(self, srcpath, destpath):
-    log.debug("link: %s:%s"%(srcpath, destpath))
+    log.debug("%s %s", srcpath, destpath)
     #Add image from stream to set, w/o retrieving
     slist = srcpath.split('/')
     sname_file = slist.pop(-1)
@@ -639,7 +651,7 @@ class Flickrfs(Fuse):
     if not destpath.startswith('/sets/'):
       error = 1
     if error is 1:
-      log.error("Linking is allowed only between 2 image files")
+      log.error("linking is allowed only between 2 image files")
       return
     sinode = self.getInode(srcpath)
     self._mkfile(destpath, id=sinode.id, mode=sinode.mode, 
@@ -660,12 +672,12 @@ class Flickrfs(Fuse):
 
   
   def chmod(self, path, mode):
-    log.debug("chmod:%s" % path)
+    log.debug("%s %s" % path, mode)
     inode = self.getInode(path)
     typesinfo = mimetypes.guess_type(path)
 
     if inode.comm_meta is None:
-      log.debug("chmod on directory? No use la!")
+      log.debug("chmod on directory ignored")
       return
         
     elif typesinfo[0] is None or typesinfo[0].count('image')<=0:
@@ -679,10 +691,10 @@ class Flickrfs(Fuse):
       return
     
   def chown(self, path, user, group):
-    log.debug("chown. Are you of any use in flickrfs?")
+    log.debug("%s:%s %s (ignored)", user, group, path)
     
   def truncate(self, path, size):
-    log.debug("truncate?? Okay okay! I accept your usage:%s:%s"%(path,size))
+    log.debug("%s %s", path, size)
     ind = path.rindex('/')
     name_file = path[ind+1:]
 
@@ -694,8 +706,7 @@ class Flickrfs(Fuse):
       return f.truncate(size)
     
   def mknod(self, path, mode, dev):
-    """ Python has no os.mknod, so we can only do some things """
-    log.debug("mknod? OK! Had a close encounter!!:%s:"%(path,))
+    log.debug("%s %s %s ", path, mode, dev)
     templist = path.split('/')
     name_file = templist[-1]
 
@@ -705,7 +716,7 @@ class Flickrfs(Fuse):
       # images automatically; and they should not go through mknod system call.
       # Editors like Vim, try to generate random swap files when reading
       # meta; and this should be *disallowed*.
-      log.debug("mknod for meta file %s? No use!" % path)
+      log.debug("mknod for meta file %s ignored", path)
       return
 
     if path.startswith('/sets/'):
@@ -714,7 +725,7 @@ class Flickrfs(Fuse):
       templist[1] = templist[1].split(':')[0]
     path = '/'.join(templist)
 
-    log.debug("mknod: Modified file path %s" % path)
+    log.debug("modified file path %s", path)
     #Lets guess what kind of a file is this. 
     #Is it an image file? or, some other temporary file
     #created by the tools you're using. 
@@ -729,7 +740,7 @@ class Flickrfs(Fuse):
       self._mkfile(path, id="NEW", mode=mode)
 
   def mkdir(self, path, mode):
-    log.debug("mkdir:" + path + ":")
+    log.debug("%s with mode %s", path, mode)
     if path.startswith("/tags"):
       if path.count('/')==3:   #/tags/personal (or private)/dirname ONLY
         self._mkdir(path)
@@ -764,7 +775,7 @@ class Flickrfs(Fuse):
     return 0
 
   def open(self, path, flags):
-    log.info("open: " + path)
+    log.info("%s with flags %s", path, flags)
     ind = path.rindex('/')
     name_file = path[ind+1:]
     if name_file.startswith('.') and name_file.endswith('.meta'):
@@ -772,7 +783,7 @@ class Flickrfs(Fuse):
       return 0
     typesinfo = mimetypes.guess_type(path)
     if typesinfo[0] is None or typesinfo[0].count('image')<=0:
-      log.debug('open: non-image file found %s' % path)
+      log.debug('non-image file found %s', path)
       self.handleAccessToNonImage(path)
       return 0
     
@@ -782,22 +793,22 @@ class Flickrfs(Fuse):
     elif path.startswith('/stream'):
       templist[1] = templist[1].split(':')[0]
     path = '/'.join(templist)
-    log.debug("open:After modifying:%s:" % (path))
+    log.debug("path after modification is %s", path)
     
     inode = self.getInode(path)
     if inode.photoId=="NEW": #Just skip if new (i.e. uploading)
       return 0
     if self.imgCache.getBuffer(inode.photoId)=="":  
-      log.debug("Retrieving image from flickr: " + inode.photoId)
+      log.debug("retrieving image %s from flickr", inode.photoId)
       self.imgCache.setBuffer(inode.photoId,
           str(self.transfl.getPhoto(inode.photoId)))
       inode.size = self.imgCache.getBufLen(inode.photoId)
-      log.debug("Size of image: " + str(inode.size))
+      log.debug("size of image is %s", inode.size)
       self.updateInode(path, inode)
     return 0
     
   def read(self, path, length, offset):
-    log.debug("read:%s:offset:%s:length:%s:" % (path,offset,length))
+    log.debug("%s offset %s length %s", path, offset, length)
     ind = path.rindex('/')
     name_file = path[ind+1:]
     if name_file.startswith('.') and name_file.endswith('.meta'):
@@ -812,9 +823,9 @@ class Flickrfs(Fuse):
 
   def parse(self, fname, photoId):
     cp = ConfigParser.ConfigParser()
-    log.debug("Parsing file %s" % fname)
+    log.debug("parsing file %s for photoid %s", fname, photoId)
     cp.read(fname)
-    log.debug("Read file %s for parsing." % fname)
+    log.debug("file %s has been read by ConfigParser", fname)
     options = cp.options('metainfo')
     title=''
     desc=''
@@ -829,16 +840,16 @@ class Flickrfs(Fuse):
     if 'license' in options:
       license = cp.get('metainfo', 'license')
       
-    log.debug("Setting metadata for file %s" % fname)
+    log.debug("setting metadata for file %s", fname)
     if self.transfl.setMeta(photoId, title, desc)==False:
       return "Error:Can't set Meta information"
       
-    log.debug("Setting tags:%s:"%(fname,))
+    log.debug("setting tags for %s", fname)
     if self.transfl.setTags(photoId, tags)==False:
-      log.debug("Setting tags FAILED : %s" % fname)
+      log.debug("setting tags for %s failed", fname)
       return "Error:Can't set tags"
 
-    log.debug("Setting license:%s:"%(fname,))
+    log.debug("setting license for %s", fname)
     if self.transfl.setLicense(photoId, license)==False:
       return "Error:Can't set license"
             
@@ -853,18 +864,18 @@ class Flickrfs(Fuse):
   def handleAccessToNonImage(self, path):
     inode = self.getInode(path)
     if inode is None:
-      log.error("inode doesn't exist:%s:"%(path,))
+      log.error("inode %s doesn't exist", path)
       e = OSError("No inode found")
       e.errno = EIO
       raise e
     fname = os.path.join(flickrfsHome, '.'+inode.photoId) #ext
     # Handle the case when file already exists.
     if not os.path.exists(fname) or os.path.getsize(fname) == 0L:
-      log.info("Retrieving meta information for file %s and photo id %s" % 
-               (fname, inode.photoId))
+      log.info("retrieving meta information for file %s and photo id %s", 
+               fname, inode.photoId)
       INFO = self.transfl.getPhotoInfo(inode.photoId)
       size = self.writeMetaInfo(inode.photoId, INFO)
-      log.info("Information has been written for photo id %s" % inode.photoId)
+      log.info("information has been written for photo id %s", inode.photoId)
       inode.size = size
       self.updateInode(path, inode)
       time.sleep(1) # Enough time for OS to call for getattr again.
@@ -879,16 +890,16 @@ class Flickrfs(Fuse):
   def handleReadImage(self, path, length, offset):
     inode = self.getInode(path)
     if inode is None:
-      log.error("inode doesn't exist:%s:"%(path,))
+      log.error("inode %s doesn't exist", path)
       e = OSError("No inode found")
       e.errno = EIO
       raise e
     if self.imgCache.getBufLen(inode.photoId) is 0:  
-      log.debug("Retrieving image from flickr: " + inode.photoId)
+      log.debug("retrieving image %s from flickr", inode.photoId)
       buf = retryFlickrOp(False, self.transfl.getPhoto,
                           inode.photoId)
       if len(buf) == 0:
-        log.error("Can't retrieve image %s"%(inode.photoId,))
+        log.error("can't retrieve image %s", inode.photoId)
         e = OSError("Unable to retrieve image.")
         e.errno = EIO
         raise e
@@ -903,7 +914,7 @@ class Flickrfs(Fuse):
   def handleWriteToNonImage(self, path, buf, off):
     inode = self.handleAccessToNonImage(path)
     fname = os.path.join(flickrfsHome, '.'+inode.photoId) #ext
-    log.debug("Writing to :%s:"%(fname,))
+    log.debug("writing to %s", fname)
     f = open(fname, 'r+')
     f.seek(off)
     f.write(buf)
@@ -922,15 +933,15 @@ class Flickrfs(Fuse):
     tags = [ '"%s"'%(a,) for a in taglist]
     tags.append('flickrfs')
     taglist = ' '.join(tags)
-    log.info('uploading %s with len %s' % 
-             (path, self.imgCache.getBufLen(inode.photoId)))
+    log.info('uploading %s with len %s', 
+             path, self.imgCache.getBufLen(inode.photoId))
     id = None
     bufData = self.imgCache.getBuffer(inode.photoId)
     bufData = self.imageResize(bufData)
     id = retryFlickrOp(False, self.transfl.uploadfile,
                        path, taglist, bufData, inode.mode)
     if id is None:
-      log.error("unable to upload file:%s:"%(inode.photoId,))
+      log.error("unable to upload file %s", inode.photoId)
       e = OSError("Unable to upload file.")
       e.errno = EIO
       raise e
@@ -942,7 +953,7 @@ class Flickrfs(Fuse):
   def handleWriteToBuffer(self, path, buf):
     inode = self.getInode(path)
     if inode is None:
-      log.error("inode doesn't exist:%s:"%(path,))
+      log.error("inode %s doesn't exist", path)
       e = OSError("No inode found")
       e.errno = EIO
       raise e
@@ -960,7 +971,7 @@ class Flickrfs(Fuse):
         self.updateInode(parentPath, pinode)
         return
       else:
-        log.error("Unable to create set:%s"%(parentPath,))
+        log.error("unable to create set %s", parentPath)
         e = OSError("Unable to create set.")
         e.errno = EIO
         raise e
@@ -977,7 +988,7 @@ class Flickrfs(Fuse):
   #############################
 
   def write(self, path, buf, off):
-    log.debug("write:%s:%s"%(path, off))
+    log.debug("write to %s at offset %s", path, off)
     ind = path.rindex('/')
     name_file = path[ind+1:]
     if name_file.startswith('.') and name_file.count('.meta')>0:
@@ -1010,7 +1021,7 @@ class Flickrfs(Fuse):
         pinode = self.getInode(parentPath)
         inode = self.handleUploadingImage(path, inode, setnTags)
         self.handleWriteAddToSet(parentPath, pinode, inode)
-    log.debug("After modifying write:%s:%s"%(path, off))
+    log.debug("done write to %s at offset %s", path, off)
     if len(buf)<4096:
       templist = path.split('/')
       templist.pop(-1)
@@ -1027,17 +1038,17 @@ class Flickrfs(Fuse):
 
   def getInode(self, path):
     if self.inodeCache.has_key(path):
-      #log.debug("Got cached inode: " + path)
+      #log.debug("got cached inode for %s", path)
       return self.inodeCache[path]
     else:
-      #log.debug("No inode??? I DIE!!!")
+      #log.debug("%s is not in inode cache", path)
       return None
 
   def updateInode(self, path, inode):
     self.inodeCache[path] = inode
 
   def release(self, path, flags):
-    log.debug("flickrfs.py:Flickrfs:release: %s %s" % (path,flags))
+    log.debug("%s with flags %s ignored", path, flags)
     return 0
   
   def statfs(self):
@@ -1070,8 +1081,8 @@ class Flickrfs(Fuse):
     if self.statfsCounter >= 500 or self.statfsCounter is -1:
       (self.max, self.used) = self.transfl.getBandwidthInfo()
       self.statfsCounter = 0
-      log.info('statfs: Retrieved Bandwidth info: max %s used %s' % 
-               (self.max, self.used))
+      log.info('retrieved bandwidth info: max %s used %s', 
+               self.max, self.used)
     self.statfsCounter = self.statfsCounter + 1
 
     if self.max is not None:
@@ -1083,8 +1094,7 @@ class Flickrfs(Fuse):
               files, files_free, namelen)
 
   def fsync(self, path, isfsyncfile):
-    log.debug("flickrfs.py:Flickrfs:fsync: path=%s, isfsyncfile=%s" % 
-              (path,isfsyncfile))
+    log.debug("%s,  isfsyncfile=%s", path, isfsyncfile)
     return 0
 
 
@@ -1094,5 +1104,5 @@ if __name__ == '__main__':
     server.multithreaded = 1;
     server.main()
   except KeyError:
-    log.error('Got key error. Exiting...')
+    log.error('got key error; exiting...')
     sys.exit(0)

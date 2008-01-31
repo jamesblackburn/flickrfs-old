@@ -68,5 +68,8 @@ Please check out the latest documentation at: http://flickrfs.sourceforge.net
           having no photos appear when there are lots of sets.
       - 20080128RDM bugfix: handle the case of the photo not having an
            'originalformat' property in getPhotoInfo (default to jpg).
-      - 20080129RDM bigfix: removed limit of 500 images per directory
+      - 20080129RDM bugfix: removed limit of 500 images per directory
            in the 'sets' directory.  Bug still exists for other directories.
+      - 20080131RDM feature: made the logging message formats more consistent, and
+           made fuller use of the python logging facility features.
+      - 20080131RDM bugfix: log exceptions in timerThread if they happen

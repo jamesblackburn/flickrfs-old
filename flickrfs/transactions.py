@@ -21,6 +21,8 @@ import sys
 import string
 import os
 import time
+import logging
+log = logging.getLogger('flickrfs.trans')
 
 # flickr auth information
 flickrAPIKey = "f8aa9917a9ae5e44a87cae657924f42d"  # API key
@@ -35,32 +37,31 @@ class TransFlickr:
 
   extras = "original_format,date_upload,last_update"
 
-  def __init__(self, logg, browserName):
-    global log
-    log = logg
+  def __init__(self, browserName):
     self.fapi = FlickrAPI(flickrAPIKey, flickrSecret)
     self.user_id = ""
     # proceed with auth
     # TODO use auth.checkToken function if available, 
     # and wait after opening browser.
     print "Authorizing with flickr..."
-    log.info("Authorizing with flickr...")
+    log.info("authorizing with flickr...")
     try:
       self.authtoken = self.fapi.getToken(browser=browserName)
     except:
-      print ("Can't retrieve token from browser:%s:"%(browserName,))
+      print ("Can't retrieve token from browser %s" % browserName)
       print ("\tIf you're behind a proxy server,"
              " first set http_proxy environment variable.")
       print "\tPlease close all your browser windows, and try again"
       log.error(format_exc())
-      log.error("Can't retrieve token from browser:%s:"%(browserName,))
+      log.error("can't retrieve token from browser %s", browserName)
       sys.exit(-1)
     if self.authtoken == None:
-      log.error('Not able to authorize. Exiting...')
+      print "Unable to authorize (reason unknown)"
+      log.error('not able to authorize; exiting')
       sys.exit(-1)
         #Add some authorization checks here(?)
     print "Authorization complete."
-    log.info('Authorization complete')
+    log.info('authorization complete')
     
   def uploadfile(self, filepath, taglist, bufData, mode):
     #Set public 4(always), 1(public). Public overwrites f&f.
@@ -72,10 +73,11 @@ class TransFlickr:
       #E.g. 754 - 5:friends, but not public
       #E.g. 774 - 7:f&f, but not public
 
-    log.info("Uploading file %s with data of len %s" % (filepath, len(bufData)))
-    log.info("and tags %s" % str(taglist))
-    log.info("Permissions: Family %s Friends %s Public %s" % 
-             (family,friends,public))
+    log.info("uploading file %s", filepath)
+    log.info("  data length: %s", len(bufData))
+    log.info("  taglist: %s", taglist)
+    log.info("  permissions: family %s, friends %s, public %s",
+             family, friends, public)
     filename = os.path.splitext(os.path.basename(filepath))[0]
     rsp = self.fapi.upload(filename=filepath, jpegData=bufData,
           title=filename,
@@ -85,13 +87,12 @@ class TransFlickr:
           is_family=family and "1" or "0")
 
     if rsp is None:
-      log.error("Seems like we could't write file %s."
-                " Running checks." % filepath)
+      log.error("response None from attempt to write file %s", filepath)
+      log.error("will attempt recovery...")
       recent_rsp = None
       trytimes = 2
       while(trytimes):
-        log.info("Trying to retrieve the recently updated photo."
-                 " Sleeping for 3 seconds...")
+        log.info("sleeping for 3 seconds...")
         time.sleep(3)
         trytimes -= 1
         # Keep on trying to retrieve the recently uploaded photo, till we
@@ -101,56 +102,58 @@ class TransFlickr:
               auth_token=self.authtoken, min_date='1', per_page='1')
         
         pic = recent_rsp.photos[0].photo[0]
-        log.info('Pic looking for is %s' % filename)
-        log.info('Most recently updated pic is %s' % pic['title'])
+        log.info('we are looking for %s', filename)
+        log.info('most recently updated pic is %s', pic['title'])
         if filename == pic['title']:
           id = pic['id']
-          log.info("File uploaded %s with photoid %s" % (filepath, id))
+          log.info("file %s uploaded with photoid %s", filepath, id)
           return id
+      log.error("giving up; upload of %s appears to have failed", filepath)
       return None
     else:
       id = rsp.photoid[0].elementText
-      log.info("File uploaded %s with photoid %s" % (filepath, id))
+      log.info("file %s uploaded with photoid %s", filepath, id)
       return id
 
   def put2Set(self, set_id, photo_id):
-    log.info("Uploading photo %s to set id %s" % (photo_id, set_id))
+    log.info("uploading photo %s to set id %s", photo_id, set_id)
     rsp = self.fapi.photosets_addPhoto(auth_token=self.authtoken, 
                                        photoset_id=set_id, photo_id=photo_id)
     if rsp:
-      log.info("Uploaded photo to set")
+      log.info("photo uploaded to set")
     else:
       log.error(rsp.errormsg)
   
   def createSet(self, path, photo_id):
-    log.info("Creating set %s with primary photo %s" % (path,photo_id))
+    log.info("creating set %s with primary photo %s", path, photo_id)
     path, title = os.path.split(path)
     rsp = self.fapi.photosets_create(auth_token=self.authtoken, 
                                      title=title, primary_photo_id=photo_id)
     if rsp:
-      log.info("Created set %s" % title)
+      log.info("created set %s", title)
       return rsp.photoset[0]['id']
     else:
       log.error(rsp.errormsg)
   
   def deleteSet(self, set_id):
-    log.info("Deleting set %s" % set_id)
+    log.info("deleting set %s", set_id)
     if str(set_id)=="0":
-      log.info("The set %s is non-existant online." % set_id)
+      log.info("ignoring attempt to delete set wtih set_id 0 (a locally "
+        "created set that has not yet acquired an id via uploading")
       return
     rsp = self.fapi.photosets_delete(auth_token=self.authtoken, 
                                      photoset_id=set_id)
     if rsp:
-      log.info("Deleted set %s." % set_id)
+      log.info("deleted set %s", set_id)
     else:
       log.error(rsp.errormsg)
   
   def getPhotoInfo(self, photoId):
-    log.debug("getPhotoInfo")
+    log.debug("id: %s", photoId)
     rsp = self.fapi.photos_getInfo(auth_token=self.authtoken, photo_id=photoId)
     if not rsp:
-      log.error("Can't retrieve information about photo %s, with error %s" % 
-                (photoId, rsp.errormsg))
+      log.error("can't retrieve information about photo %s; got error %s",
+                photoId, rsp.errormsg)
       return None
     #XXX: should see if there's some other 'format' option we can fall back to.
     try: format = rsp.photo[0]['originalformat']
@@ -192,7 +195,7 @@ class TransFlickr:
             license, owner, ownerNSID, url, int(posted), int(lastupdate))
 
   def setPerm(self, photoId, mode, comm_meta="33"):
-    log.debug("setPerm")
+    log.debug("id: %s, mode: %s, comm_meta=%s", photoId, mode, comm_meta)
     public = mode&1 #Set public 4(always), 1(public). Public overwrites f&f
     #Set friends and family 4(always), 2(family), 1(friends) 
     friends = mode>>3 & 1
@@ -209,40 +212,40 @@ class TransFlickr:
                                     perm_addmeta=comm_meta[1], 
                                     photo_id=photoId)
     if not rsp:
-      log.error("Couldn't set permission for photo %s with error %s" % 
-                (photoId,rsp.errormsg))
+      log.error("couldn't set permission for photo %s; got error %s",
+                photoId, rsp.errormsg)
       return False
-    log.info("Permission has been set for photo %s" % photoId)
+    log.info("permissions have been set for photo %s", photoId)
     return True
 
   def setTags(self, photoId, tags):
-    log.debug("setTags")
+    log.debug("id: %s, tags: %s", photoId, tags)
     templist = [ '"%s"'%(a,) for a in string.split(tags, ',')] + ['flickrfs']
     tagstring = ' '.join(templist)
     rsp = self.fapi.photos_setTags(auth_token=self.authtoken, 
                                    photo_id=photoId, tags=tagstring)
     if not rsp:
-      log.error("Couldn't set tags %s with error %s" % 
-                (photoId, rsp.errormsg))
+      log.error("couldn't set tags for %s; got error %s",
+                photoId, rsp.errormsg)
       return False
     return True
   
   def setMeta(self, photoId, title, desc):
-    log.debug("setMeta")
+    log.debug("id: %s, title: %s, desc: %s", photoId, title, desc)
     rsp = self.fapi.photos_setMeta(auth_token=self.authtoken, 
                                    photo_id=photoId, title=title, 
                                    description=desc)
     if not rsp:
-      log.error("Couldn't set meta info for photo %s with error" % 
-                (photoId, rsp.errormsg))
+      log.error("couldn't set meta info for photo %s; got error",
+                photoId, rsp.errormsg)
       return False
     return True
 
   def getLicenses(self):
-    log.debug("getLicenses")
+    log.debug("started")
     rsp = self.fapi.photos_licenses_getInfo()
     if not rsp:
-      log.error("Couldn't retrieve licenses with error %s" % rsp.errormsg)
+      log.error("couldn't retrieve licenses; got error %s", rsp.errormsg)
       return None
     licenseDict = {}
     for l in rsp.licenses[0].license:
@@ -256,23 +259,23 @@ class TransFlickr:
     return sortedLicenseList
     
   def setLicense(self, photoId, license):
-    log.debug("setLicense")
+    log.debug("id: %s, license: %s", photoId, license)
     rsp = self.fapi.photos_licenses_setLicense(auth_token=self.authtoken, 
                                                photo_id=photoId, 
                                                license_id=license)
     if not rsp:
-      log.error("Couldn't set license info for photo %s with error %s" % 
-                (photoId, rsp.errormsg))
+      log.error("couldn't set license info for photo %s; got error %s",
+                photoId, rsp.errormsg)
       return False
     return True
 
   def getPhoto(self, photoId):
-    log.debug("getPhoto")
+    log.debug("id: %s", photoId)
     rsp = self.fapi.photos_getSizes(auth_token=self.authtoken, 
                                     photo_id=photoId)
     if not rsp:
-      log.error("Error while trying to retrieve size information"
-                " for photo %s" % photoId)
+      log.error("error while trying to retrieve size information"
+                " for photo %s", photoId)
       return None
     buf = ""
     for a in rsp.sizes[0].size:
@@ -281,7 +284,7 @@ class TransFlickr:
           f = urllib2.urlopen(a['source'])
           buf = f.read()
         except:
-          log.error("Exception in getPhoto")
+          log.error("exception in getPhoto")
           log.error(format_exc())
           return ""
     if not buf:
@@ -290,54 +293,55 @@ class TransFlickr:
     return buf
 
   def removePhotofromSet(self, photoId, photosetId):
-    log.debug("removePhotofromSet")
+    log.debug("id: %s, setid: %s", photoId, photosetId)
     rsp = self.fapi.photosets_removePhoto(auth_token=self.authtoken, 
                                           photo_id=photoId, 
                                           photoset_id=photosetId)
     if rsp:
-      log.info("Photo %s removed from set %s" % (photoId, photosetId))
+      log.info("photo %s removed from set %s", photoId, photosetId)
     else:
       log.error(rsp.errormsg)
       
     
   def getBandwidthInfo(self):
-    log.debug("Retrieving bandwidth information")
+    log.debug("retrieving bandwidth information")
     rsp = self.fapi.people_getUploadStatus(auth_token=self.authtoken)
     if not rsp:
-      log.error("Can't retrieve bandwidth information: %s" % rsp.errormsg)
+      log.error("can't retrieve bandwidth information; got error %s",
+        rsp.errormsg)
       return (None,None)
     bw = rsp.user[0].bandwidth[0]
-    log.debug("Bandwidth: max:" + bw['max'])
-    log.debug("Bandwidth: used:" + bw['used'])
+    log.debug("max bandwidth: %s, bandwidth used: %s", bw['max'], bw['used'])
     return (bw['max'], bw['used'])
 
   def getUserId(self):
-    log.debug("getUserId")
+    log.debug("entered")
     rsp = self.fapi.auth_checkToken(api_key=flickrAPIKey, 
                                     auth_token=self.authtoken)
     if not rsp:
-      log.error("Unable to get userid:" + rsp.errormsg)
+      log.error("unable to get userid; got error %s", rsp.errormsg)
       return None
     usr = rsp.auth[0].user[0]
-    log.info("Got NSID:"+ usr['nsid'] + ":")
+    log.info("got NSID %s", usr['nsid'])
     #Set self.user_id to this value
     self.user_id = usr['nsid']
     return usr['nsid']
 
   def getPhotosetList(self):
-    log.debug("getPhotosetList")
+    log.debug("entered")
     if self.user_id is "":
       self.getUserId() #This will set the value of self.user_id
     rsp = self.fapi.photosets_getList(auth_token=self.authtoken, 
                                       user_id=self.user_id)
     if not rsp:
-      log.error("Error getting photoset list: %s" % (rsp.errormsg))
+      log.error("error getting photoset list; got error %s", rsp.errormsg)
       return []
     if not hasattr(rsp.photosets[0], "photoset"):
-      log.info("No sets found!")
+      log.info("no sets found for userid %s", self.user_id)
       return []
     else:
-      log.info("Sets found!")
+      log.info("%s sets found for userid %s",
+          len(rsp.photosets[0].photoset), self.user_id)
     return rsp.photosets[0].photoset
 
   def parseInfoFromPhoto(self, photo, perms=None):
@@ -374,7 +378,7 @@ class TransFlickr:
     return info
 
   def getPhotosFromPhotoset(self, photoset_id):
-    log.debug("getPhotosFromPhotoset")
+    log.debug("set id: %s", photoset_id)
     photosPermsMap = {}
     # I'm not utilizing the value part of this dictionary. Its arbitrarily
     # set to i.
@@ -389,30 +393,32 @@ class TransFlickr:
         if not rsp:
           break
         if not hasattr(rsp.photoset[0], 'photo'):
-          log.error("Photoset %s Doesn't have attribute photo." % rsp.photoset[0]['id'])
+          log.error("photoset %s doesn't have attribute photo", rsp.photoset[0]['id'])
           break
         for p in rsp.photoset[0].photo:
           photosPermsMap[p] = str(i)
         page += 1
-        if page > rsp.photoset[0]['pages']: break
+        if page > int(rsp.photoset[0]['pages']): break
       if photosPermsMap: break
     return photosPermsMap
             
   def getPhotoStream(self, user_id):
-    log.debug("getPhotoStream")
+    log.debug("userid: %s", user_id)
     retList = []
     pageNo = 1
     maxPage = 1
     while pageNo<=maxPage:
-      log.info("maxPage:%s pageNo:%s"%(maxPage, pageNo))
+      log.info("retreiving page number %s of %s", pageNo, maxPage) 
       rsp = self.fapi.photos_search(auth_token=self.authtoken, 
                                     user_id=user_id, per_page="500", 
                                     page=str(pageNo), extras=self.extras)
       if not rsp:
-        log.error("Can't retrive photos from your stream: %s" % rsp.errormsg)
+        log.error("can't retrive photos from your stream; got error %s",
+            rsp.errormsg)
         return retList
       if not hasattr(rsp.photos[0], 'photo'):
-        log.error("Doesn't have attribute photos. Page requested %s" % pageNo)
+        log.error("photos.search response doesn't have attribute photos; "
+            "returning list acquired so far")
         return retList
       for a in rsp.photos[0].photo:
         retList.append(a)
@@ -421,16 +427,16 @@ class TransFlickr:
     return retList
  
   def getTaggedPhotos(self, tags, user_id=None):
-    log.debug("getTaggedPhotos")
+    log.debug("tags: %s user_id: %s", tags, user_id)
     kw = kwdict(auth_token=self.authtoken, tags=tags, tag_mode="all", 
                 extras=self.extras, per_page="500")
     if user_id is not None: 
       kw = kwdict(user_id=user_id, **kw)
     rsp = self.fapi.photos_search(**kw)
-    log.debug("Search for photos with tags %s has been"
-              " successfully finished." % tags)
+    log.debug("search for photos with tags %s has been"
+              " successfully finished" % tags)
     if not rsp:
-      log.error("Couldn't search for the photos: %s" % rsp.errormsg)
+      log.error("couldn't search for the photos; got error %s", rsp.errormsg)
       return
     if not hasattr(rsp.photos[0], 'photo'):
       return []
